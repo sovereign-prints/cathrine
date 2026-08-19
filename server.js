@@ -1,5 +1,4 @@
 const express = require('express');
-const Database = require('better-sqlite3');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
@@ -9,11 +8,6 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Initialize database with persistent file
-const dbPath = process.env.DATABASE_URL || 'sovereign-prints.db';
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
 
 // Middleware
 app.use(cors());
@@ -34,168 +28,97 @@ const upload = multer({
   }
 });
 
-// Ensure uploads directory exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
+// Ensure required directories exist
+const dirs = ['uploads', 'data'];
+dirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
-// Initialize database tables
-function initializeDatabase() {
-  try {
-    // Products table
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        category TEXT NOT NULL,
-        basePrice REAL NOT NULL,
-        image TEXT,
-        specifications TEXT,
-        turnaroundDays INTEGER,
-        active BOOLEAN DEFAULT 1,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+// Data file paths
+const dataDir = 'data';
+const productsFile = path.join(dataDir, 'products.json');
+const quotesFile = path.join(dataDir, 'quotes.json');
 
-    // Product pricing tiers table
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS pricingTiers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        productId INTEGER NOT NULL,
-        quantityMin INTEGER NOT NULL,
-        quantityMax INTEGER,
-        price REAL NOT NULL,
-        FOREIGN KEY (productId) REFERENCES products(id)
-      )
-    `);
+// Initialize data files
+function initializeData() {
+  const products = [
+    // Clothing
+    { id: 1, name: 'T-Shirt Printing', category: 'Clothing', basePrice: 120, description: 'Custom branded T-shirts for businesses and events', specifications: 'Various sizes, single or multi-color prints', turnaroundDays: 5, active: true, pricingTiers: [{ id: 1, quantityMin: 1, quantityMax: 10, price: 120 }, { id: 2, quantityMin: 11, quantityMax: 50, price: 108 }, { id: 3, quantityMin: 51, quantityMax: 100, price: 96 }, { id: 4, quantityMin: 101, quantityMax: null, price: 84 }] },
+    { id: 2, name: 'Hoodie Printing', category: 'Clothing', basePrice: 250, description: 'Premium branded hoodies', specifications: 'Unisex fit, durable printing', turnaroundDays: 5, active: true, pricingTiers: [{ id: 5, quantityMin: 1, quantityMax: 10, price: 250 }, { id: 6, quantityMin: 11, quantityMax: 50, price: 225 }, { id: 7, quantityMin: 51, quantityMax: 100, price: 200 }, { id: 8, quantityMin: 101, quantityMax: null, price: 175 }] },
+    { id: 3, name: 'Cap Branding', category: 'Clothing', basePrice: 85, description: 'Custom branded caps', specifications: 'Adjustable or structured', turnaroundDays: 5, active: true, pricingTiers: [{ id: 9, quantityMin: 1, quantityMax: 10, price: 85 }, { id: 10, quantityMin: 11, quantityMax: 50, price: 76 }, { id: 11, quantityMin: 51, quantityMax: 100, price: 68 }, { id: 12, quantityMin: 101, quantityMax: null, price: 59 }] },
 
-    // Quotes table
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS quotes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        referenceNumber TEXT UNIQUE NOT NULL,
-        customerName TEXT NOT NULL,
-        customerEmail TEXT NOT NULL,
-        customerPhone TEXT,
-        service TEXT NOT NULL,
-        description TEXT,
-        requirements TEXT,
-        estimatedPrice REAL,
-        status TEXT DEFAULT 'pending',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        respondedAt DATETIME,
-        notes TEXT
-      )
-    `);
+    // Vinyl
+    { id: 4, name: 'Vinyl Decals', category: 'Vinyl', basePrice: 150, description: 'Custom vinyl decals for any surface', specifications: 'Die-cut or standard shapes', turnaroundDays: 5, active: true, pricingTiers: [{ id: 13, quantityMin: 1, quantityMax: 10, price: 150 }, { id: 14, quantityMin: 11, quantityMax: 50, price: 135 }, { id: 15, quantityMin: 51, quantityMax: 100, price: 120 }, { id: 16, quantityMin: 101, quantityMax: null, price: 105 }] },
+    { id: 5, name: 'Wall Graphics', category: 'Vinyl', basePrice: 500, description: 'Large-scale wall decals', specifications: 'Custom sizes, easy application', turnaroundDays: 5, active: true, pricingTiers: [{ id: 17, quantityMin: 1, quantityMax: 10, price: 500 }, { id: 18, quantityMin: 11, quantityMax: 50, price: 450 }, { id: 19, quantityMin: 51, quantityMax: 100, price: 400 }, { id: 20, quantityMin: 101, quantityMax: null, price: 350 }] },
 
-    // Admin users table
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS adminUsers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        email TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // Vehicle Branding
+    { id: 6, name: 'Full Vehicle Wrap', category: 'Vehicle Branding', basePrice: 5000, description: 'Complete vehicle branding', specifications: 'Includes design consultation', turnaroundDays: 5, active: true, pricingTiers: [{ id: 21, quantityMin: 1, quantityMax: 10, price: 5000 }] },
+    { id: 7, name: 'Partial Wrap', category: 'Vehicle Branding', basePrice: 2500, description: 'Partial vehicle branding', specifications: 'Hood, doors, or side panels', turnaroundDays: 5, active: true, pricingTiers: [{ id: 22, quantityMin: 1, quantityMax: 10, price: 2500 }] },
 
-    // Check if products exist (if not, insert sample data)
-    const checkProducts = db.prepare('SELECT COUNT(*) as count FROM products').get();
-    if (checkProducts.count === 0) {
-      insertSampleData();
-    }
-  } catch (err) {
-    console.error('Database initialization error:', err);
+    // Glass & Mugs
+    { id: 8, name: 'Printed Mug', category: 'Glass & Mugs', basePrice: 95, description: 'Custom printed mugs', specifications: '11oz ceramic mugs', turnaroundDays: 5, active: true, pricingTiers: [{ id: 23, quantityMin: 1, quantityMax: 10, price: 95 }, { id: 24, quantityMin: 11, quantityMax: 50, price: 85 }, { id: 25, quantityMin: 51, quantityMax: 100, price: 76 }, { id: 26, quantityMin: 101, quantityMax: null, price: 66 }] },
+    { id: 9, name: 'Printed Glass', category: 'Glass & Mugs', basePrice: 120, description: 'Custom printed glasses', specifications: 'Various sizes available', turnaroundDays: 5, active: true, pricingTiers: [{ id: 27, quantityMin: 1, quantityMax: 10, price: 120 }, { id: 28, quantityMin: 11, quantityMax: 50, price: 108 }, { id: 29, quantityMin: 51, quantityMax: 100, price: 96 }, { id: 30, quantityMin: 101, quantityMax: null, price: 84 }] },
+
+    // Signage
+    { id: 10, name: 'Indoor Signage', category: 'Signage', basePrice: 800, description: 'Indoor business signage', specifications: 'Custom design and installation', turnaroundDays: 5, active: true, pricingTiers: [{ id: 31, quantityMin: 1, quantityMax: 10, price: 800 }] },
+    { id: 11, name: 'Outdoor Signs', category: 'Signage', basePrice: 1200, description: 'Weather-resistant outdoor signs', specifications: 'Durable materials, UV protected', turnaroundDays: 5, active: true, pricingTiers: [{ id: 32, quantityMin: 1, quantityMax: 10, price: 1200 }] },
+
+    // Printing
+    { id: 12, name: 'Business Cards', category: 'Printing', basePrice: 350, description: 'Professional business cards', specifications: '250 units, 300gsm cardstock', turnaroundDays: 5, active: true, pricingTiers: [{ id: 33, quantityMin: 1, quantityMax: 10, price: 350 }, { id: 34, quantityMin: 11, quantityMax: 50, price: 315 }, { id: 35, quantityMin: 51, quantityMax: 100, price: 280 }, { id: 36, quantityMin: 101, quantityMax: null, price: 245 }] },
+    { id: 13, name: 'Flyers & Brochures', category: 'Printing', basePrice: 400, description: 'Marketing flyers and brochures', specifications: 'A5 or A4 size, full color', turnaroundDays: 5, active: true, pricingTiers: [{ id: 37, quantityMin: 1, quantityMax: 10, price: 400 }, { id: 38, quantityMin: 11, quantityMax: 50, price: 360 }, { id: 39, quantityMin: 51, quantityMax: 100, price: 320 }, { id: 40, quantityMin: 101, quantityMax: null, price: 280 }] }
+  ];
+
+  if (!fs.existsSync(productsFile)) {
+    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+    console.log('Products data initialized');
+  }
+
+  if (!fs.existsSync(quotesFile)) {
+    fs.writeFileSync(quotesFile, JSON.stringify([], null, 2));
+    console.log('Quotes data initialized');
   }
 }
 
-// Insert sample products and data
-function insertSampleData() {
+// Helper functions to read/write data
+function readProducts() {
   try {
-    const products = [
-      // Clothing
-      { name: 'T-Shirt Printing', category: 'Clothing', basePrice: 120, description: 'Custom branded T-shirts for businesses and events', specs: 'Various sizes, single or multi-color prints' },
-      { name: 'Hoodie Printing', category: 'Clothing', basePrice: 250, description: 'Premium branded hoodies', specs: 'Unisex fit, durable printing' },
-      { name: 'Cap Branding', category: 'Clothing', basePrice: 85, description: 'Custom branded caps', specs: 'Adjustable or structured' },
-
-      // Vinyl
-      { name: 'Vinyl Decals', category: 'Vinyl', basePrice: 150, description: 'Custom vinyl decals for any surface', specs: 'Die-cut or standard shapes' },
-      { name: 'Wall Graphics', category: 'Vinyl', basePrice: 500, description: 'Large-scale wall decals', specs: 'Custom sizes, easy application' },
-
-      // Vehicle Branding
-      { name: 'Full Vehicle Wrap', category: 'Vehicle Branding', basePrice: 5000, description: 'Complete vehicle branding', specs: 'Includes design consultation' },
-      { name: 'Partial Wrap', category: 'Vehicle Branding', basePrice: 2500, description: 'Partial vehicle branding', specs: 'Hood, doors, or side panels' },
-
-      // Glass & Mugs
-      { name: 'Printed Mug', category: 'Glass & Mugs', basePrice: 95, description: 'Custom printed mugs', specs: '11oz ceramic mugs' },
-      { name: 'Printed Glass', category: 'Glass & Mugs', basePrice: 120, description: 'Custom printed glasses', specs: 'Various sizes available' },
-
-      // Signage
-      { name: 'Indoor Signage', category: 'Signage', basePrice: 800, description: 'Indoor business signage', specs: 'Custom design and installation' },
-      { name: 'Outdoor Signs', category: 'Signage', basePrice: 1200, description: 'Weather-resistant outdoor signs', specs: 'Durable materials, UV protected' },
-
-      // Printing
-      { name: 'Business Cards', category: 'Printing', basePrice: 350, description: 'Professional business cards', specs: '250 units, 300gsm cardstock' },
-      { name: 'Flyers & Brochures', category: 'Printing', basePrice: 400, description: 'Marketing flyers and brochures', specs: 'A5 or A4 size, full color' },
-    ];
-
-    const insertProduct = db.prepare(
-      `INSERT INTO products (name, category, basePrice, description, specifications) VALUES (?, ?, ?, ?, ?)`
-    );
-
-    const insertTier = db.prepare(
-      `INSERT INTO pricingTiers (productId, quantityMin, quantityMax, price) VALUES (?, ?, ?, ?)`
-    );
-
-    products.forEach(product => {
-      const result = insertProduct.run(product.name, product.category, product.basePrice, product.description, product.specs);
-      const productId = result.lastInsertRowid;
-
-      const tiers = [
-        { min: 1, max: 10, multiplier: 1 },
-        { min: 11, max: 50, multiplier: 0.9 },
-        { min: 51, max: 100, multiplier: 0.8 },
-        { min: 101, max: null, multiplier: 0.7 }
-      ];
-
-      tiers.forEach(tier => {
-        const price = Math.round(product.basePrice * tier.multiplier);
-        insertTier.run(productId, tier.min, tier.max, price);
-      });
-    });
-
-    console.log('Sample data inserted successfully');
-  } catch (err) {
-    console.error('Error inserting sample data:', err);
+    return JSON.parse(fs.readFileSync(productsFile, 'utf8'));
+  } catch {
+    return [];
   }
 }
 
-// Initialize database
-initializeDatabase();
+function readQuotes() {
+  try {
+    return JSON.parse(fs.readFileSync(quotesFile, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveQuotes(quotes) {
+  fs.writeFileSync(quotesFile, JSON.stringify(quotes, null, 2));
+}
+
+// Initialize data
+initializeData();
 
 // ==================== API ROUTES ====================
-
-// ============ CUSTOMER ROUTES ============
 
 // Get all active products
 app.get('/api/products', (req, res) => {
   try {
+    const products = readProducts();
     const category = req.query.category;
-    let query = 'SELECT * FROM products WHERE active = 1';
-    const params = [];
+    let filtered = products.filter(p => p.active);
 
     if (category) {
-      query += ' AND category = ?';
-      params.push(category);
+      filtered = filtered.filter(p => p.category === category);
     }
 
-    query += ' ORDER BY category, name';
-
-    const stmt = db.prepare(query);
-    const rows = stmt.all(...params);
-    res.json(rows);
+    res.json(filtered);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -204,17 +127,14 @@ app.get('/api/products', (req, res) => {
 // Get product details with pricing tiers
 app.get('/api/products/:id', (req, res) => {
   try {
-    const productStmt = db.prepare('SELECT * FROM products WHERE id = ?');
-    const product = productStmt.get(req.params.id);
+    const products = readProducts();
+    const product = products.find(p => p.id === parseInt(req.params.id));
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const tierStmt = db.prepare('SELECT * FROM pricingTiers WHERE productId = ? ORDER BY quantityMin');
-    const tiers = tierStmt.all(req.params.id);
-
-    res.json({ ...product, pricingTiers: tiers });
+    res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -223,9 +143,9 @@ app.get('/api/products/:id', (req, res) => {
 // Get all product categories
 app.get('/api/categories', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT DISTINCT category FROM products WHERE active = 1 ORDER BY category');
-    const rows = stmt.all();
-    res.json(rows.map(row => row.category));
+    const products = readProducts();
+    const categories = [...new Set(products.filter(p => p.active).map(p => p.category))].sort();
+    res.json(categories);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -237,12 +157,24 @@ app.post('/api/quotes', (req, res) => {
     const { customerName, customerEmail, customerPhone, service, description, requirements } = req.body;
     const referenceNumber = 'QT-' + Date.now();
 
-    const stmt = db.prepare(
-      `INSERT INTO quotes (referenceNumber, customerName, customerEmail, customerPhone, service, description, requirements, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
-    );
+    const quote = {
+      id: Date.now(),
+      referenceNumber,
+      customerName,
+      customerEmail,
+      customerPhone: customerPhone || '',
+      service,
+      description: description || '',
+      requirements: requirements || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      respondedAt: null,
+      notes: ''
+    };
 
-    const result = stmt.run(referenceNumber, customerName, customerEmail, customerPhone || '', service, description || '', requirements || '');
+    const quotes = readQuotes();
+    quotes.push(quote);
+    saveQuotes(quotes);
 
     res.json({
       success: true,
@@ -257,14 +189,21 @@ app.post('/api/quotes', (req, res) => {
 // Get quote status
 app.get('/api/quotes/:referenceNumber', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT id, referenceNumber, status, service, createdAt, respondedAt FROM quotes WHERE referenceNumber = ?');
-    const row = stmt.get(req.params.referenceNumber);
+    const quotes = readQuotes();
+    const quote = quotes.find(q => q.referenceNumber === req.params.referenceNumber);
 
-    if (!row) {
+    if (!quote) {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    res.json(row);
+    res.json({
+      id: quote.id,
+      referenceNumber: quote.referenceNumber,
+      status: quote.status,
+      service: quote.service,
+      createdAt: quote.createdAt,
+      respondedAt: quote.respondedAt
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -298,19 +237,18 @@ function adminAuth(req, res, next) {
 // Get admin dashboard stats
 app.get('/api/admin/dashboard', adminAuth, (req, res) => {
   try {
-    const newTodayStmt = db.prepare(`SELECT COUNT(*) as count FROM quotes WHERE DATE(createdAt) = DATE('now')`);
-    const newToday = newTodayStmt.get();
+    const quotes = readQuotes();
+    const products = readProducts();
+    const today = new Date().toISOString().split('T')[0];
 
-    const pendingStmt = db.prepare(`SELECT COUNT(*) as count FROM quotes WHERE status = 'pending'`);
-    const pending = pendingStmt.get();
-
-    const productsStmt = db.prepare(`SELECT COUNT(*) as count FROM products WHERE active = 1`);
-    const products = productsStmt.get();
+    const newToday = quotes.filter(q => q.createdAt.split('T')[0] === today).length;
+    const pending = quotes.filter(q => q.status === 'pending').length;
+    const totalProducts = products.filter(p => p.active).length;
 
     res.json({
-      newQuotesToday: newToday.count || 0,
-      pendingQuotes: pending.count || 0,
-      totalProducts: products.count || 0
+      newQuotesToday: newToday,
+      pendingQuotes: pending,
+      totalProducts: totalProducts
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -320,20 +258,16 @@ app.get('/api/admin/dashboard', adminAuth, (req, res) => {
 // Get all quotes (admin)
 app.get('/api/admin/quotes', adminAuth, (req, res) => {
   try {
+    const quotes = readQuotes();
     const status = req.query.status;
-    let query = 'SELECT * FROM quotes';
-    const params = [];
 
+    let filtered = quotes;
     if (status) {
-      query += ' WHERE status = ?';
-      params.push(status);
+      filtered = filtered.filter(q => q.status === status);
     }
 
-    query += ' ORDER BY createdAt DESC';
-
-    const stmt = db.prepare(query);
-    const rows = stmt.all(...params);
-    res.json(rows);
+    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(filtered);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -342,14 +276,14 @@ app.get('/api/admin/quotes', adminAuth, (req, res) => {
 // Get single quote (admin)
 app.get('/api/admin/quotes/:id', adminAuth, (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM quotes WHERE id = ?');
-    const row = stmt.get(req.params.id);
+    const quotes = readQuotes();
+    const quote = quotes.find(q => q.id === parseInt(req.params.id));
 
-    if (!row) {
+    if (!quote) {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    res.json(row);
+    res.json(quote);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -359,10 +293,18 @@ app.get('/api/admin/quotes/:id', adminAuth, (req, res) => {
 app.patch('/api/admin/quotes/:id', adminAuth, (req, res) => {
   try {
     const { status, notes } = req.body;
-    const stmt = db.prepare(
-      `UPDATE quotes SET status = ?, notes = ?, respondedAt = CURRENT_TIMESTAMP WHERE id = ?`
-    );
-    stmt.run(status, notes || '', req.params.id);
+    const quotes = readQuotes();
+    const quote = quotes.find(q => q.id === parseInt(req.params.id));
+
+    if (!quote) {
+      return res.status(404).json({ error: 'Quote not found' });
+    }
+
+    quote.status = status;
+    quote.notes = notes || '';
+    quote.respondedAt = new Date().toISOString();
+
+    saveQuotes(quotes);
     res.json({ success: true, message: 'Quote updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -373,12 +315,29 @@ app.patch('/api/admin/quotes/:id', adminAuth, (req, res) => {
 app.post('/api/admin/products', adminAuth, (req, res) => {
   try {
     const { name, category, basePrice, description, specifications, turnaroundDays } = req.body;
-    const stmt = db.prepare(
-      `INSERT INTO products (name, category, basePrice, description, specifications, turnaroundDays)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    );
-    const result = stmt.run(name, category, basePrice, description || '', specifications || '', turnaroundDays || 5);
-    res.json({ success: true, id: result.lastInsertRowid });
+    const products = readProducts();
+
+    const newProduct = {
+      id: Math.max(...products.map(p => p.id), 0) + 1,
+      name,
+      category,
+      basePrice,
+      description: description || '',
+      specifications: specifications || '',
+      turnaroundDays: turnaroundDays || 5,
+      active: true,
+      pricingTiers: [
+        { id: Date.now(), quantityMin: 1, quantityMax: 10, price: basePrice },
+        { id: Date.now() + 1, quantityMin: 11, quantityMax: 50, price: Math.round(basePrice * 0.9) },
+        { id: Date.now() + 2, quantityMin: 51, quantityMax: 100, price: Math.round(basePrice * 0.8) },
+        { id: Date.now() + 3, quantityMin: 101, quantityMax: null, price: Math.round(basePrice * 0.7) }
+      ]
+    };
+
+    products.push(newProduct);
+    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+
+    res.json({ success: true, id: newProduct.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -388,12 +347,22 @@ app.post('/api/admin/products', adminAuth, (req, res) => {
 app.patch('/api/admin/products/:id', adminAuth, (req, res) => {
   try {
     const { name, category, basePrice, description, specifications, turnaroundDays, active } = req.body;
-    const stmt = db.prepare(
-      `UPDATE products SET name = ?, category = ?, basePrice = ?, description = ?,
-       specifications = ?, turnaroundDays = ?, active = ?, updatedAt = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    );
-    stmt.run(name, category, basePrice, description || '', specifications || '', turnaroundDays || 5, active !== false ? 1 : 0, req.params.id);
+    const products = readProducts();
+    const product = products.find(p => p.id === parseInt(req.params.id));
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    product.name = name;
+    product.category = category;
+    product.basePrice = basePrice;
+    product.description = description || '';
+    product.specifications = specifications || '';
+    product.turnaroundDays = turnaroundDays || 5;
+    product.active = active !== false;
+
+    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
     res.json({ success: true, message: 'Product updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -403,8 +372,15 @@ app.patch('/api/admin/products/:id', adminAuth, (req, res) => {
 // Delete product (soft delete)
 app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
   try {
-    const stmt = db.prepare('UPDATE products SET active = 0 WHERE id = ?');
-    stmt.run(req.params.id);
+    const products = readProducts();
+    const product = products.find(p => p.id === parseInt(req.params.id));
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    product.active = false;
+    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
     res.json({ success: true, message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -415,30 +391,22 @@ app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
 app.patch('/api/admin/pricing/:tierId', adminAuth, (req, res) => {
   try {
     const { price } = req.body;
-    const stmt = db.prepare('UPDATE pricingTiers SET price = ? WHERE id = ?');
-    stmt.run(price, req.params.tierId);
-    res.json({ success: true, message: 'Price updated' });
+    const products = readProducts();
+
+    for (let product of products) {
+      const tier = product.pricingTiers?.find(t => t.id === parseInt(req.params.tierId));
+      if (tier) {
+        tier.price = price;
+        fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+        return res.json({ success: true, message: 'Price updated' });
+      }
+    }
+
+    res.status(404).json({ error: 'Pricing tier not found' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Add pricing tier
-app.post('/api/admin/pricing', adminAuth, (req, res) => {
-  try {
-    const { productId, quantityMin, quantityMax, price } = req.body;
-    const stmt = db.prepare(
-      `INSERT INTO pricingTiers (productId, quantityMin, quantityMax, price)
-       VALUES (?, ?, ?, ?)`
-    );
-    const result = stmt.run(productId, quantityMin, quantityMax, price);
-    res.json({ success: true, id: result.lastInsertRowid });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============ FILE UPLOAD ============
 
 // Upload product image
 app.post('/api/admin/upload', adminAuth, upload.single('image'), (req, res) => {
