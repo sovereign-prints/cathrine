@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — Sovereign Prints</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-box">
+      <h1>Sovereign Prints Admin</h1>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="password">Admin Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter admin password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-large">Login</button>
+        <p id="loginError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <h2>Admin</h2>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="#" data-tab="overview" class="tab-link active">Dashboard</a></li>
+        <li><a href="#" data-tab="quotes" class="tab-link">Quotes</a></li>
+        <li><a href="#" data-tab="products" class="tab-link">Products</a></li>
+        <li><a href="#" data-tab="pricing" class="tab-link">Pricing</a></li>
+        <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
+        <li><a href="#" id="logoutBtn" class="logout-link">Logout</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <!-- Dashboard Overview Tab -->
+      <div id="overviewTab" class="admin-tab active">
+        <h1>Dashboard</h1>
+        <div class="dashboard-stats">
+          <div class="stat-card">
+            <h3>New Quotes Today</h3>
+            <div class="stat-number" id="todayQuotes">0</div>
+          </div>
+          <div class="stat-card">
+            <h3>Pending Quotes</h3>
+            <div class="stat-number" id="pendingQuotes">0</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Products</h3>
+            <div class="stat-number" id="totalProducts">0</div>
+          </div>
+        </div>
+
+        <div class="recent-section">
+          <h2>Recent Quote Requests</h2>
+          <table id="recentQuotesTable" class="data-table">
+            <thead>
+              <tr>
+                <th>Ref #</th>
+                <th>Customer</th>
+                <th>Service</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentQuotesBody">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Quotes Management Tab -->
+      <div id="quotesTab" class="admin-tab">
+        <h1>Quote Management</h1>
+
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-filter="pending">Pending</button>
+          <button class="tab-btn" data-filter="responded">Responded</button>
+          <button class="tab-btn" data-filter="won">Won</button>
+          <button class="tab-btn" data-filter="lost">Lost</button>
+          <button class="tab-btn" data-filter="all">All</button>
+        </div>
+
+        <table id="quotesTable" class="data-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Customer Name</th>
+              <th>Email</th>
+              <th>Service</th>
+              <th>Date Submitted</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="quotesBody">
+            <!-- Populated by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Products Management Tab -->
+      <div id="productsTab" class="admin-tab">
+        <h1>Products Management</h1>
+
+        <button id="addProductBtn" class="btn btn-primary">+ Add New Product</button>
+
+        <table id="productsTable" class="data-table">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Category</th>
+              <th>Base Price</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsBody">
+            <!-- Populated by JavaScript -->
+          </tbody>
+        </table>
+
+        <!-- Add/Edit Product Modal -->
+        <div id="productModal" class="modal">
+          <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="productModalTitle">Add New Product</h2>
+            <form id="productForm">
+              <div class="form-group">
+                <label>Product Name *</label>
+                <input type="text" id="productName" required>
+              </div>
+
+              <div class="form-group">
+                <label>Category *</label>
+                <select id="productCategory" required>
+                  <option value="">-- Select Category --</option>
+                  <option value="Clothing">Clothing</option>
+                  <option value="Vinyl">Vinyl</option>
+                  <option value="Vehicle Branding">Vehicle Branding</option>
+                  <option value="Glass & Mugs">Glass & Mugs</option>
+                  <option value="Signage">Signage</option>
+                  <option value="Printing">Printing</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Base Price (R) *</label>
+                  <input type="number" id="productPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                  <label>Turnaround Days</label>
+                  <input type="number" id="productTurnaround" value="5">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Description</label>
+                <textarea id="productDescription" rows="3"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Specifications</label>
+                <textarea id="productSpecs" rows="3"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="productActive" checked>
+                  Active
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Product</button>
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Management Tab -->
+      <div id="pricingTab" class="admin-tab">
+        <h1>Pricing Management</h1>
+        <p>Update pricing tiers for each product</p>
+
+        <div id="pricingContainer">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div id="settingsTab" class="admin-tab">
+        <h1>Settings</h1>
+
+        <div class="settings-section">
+          <h2>Business Information</h2>
+          <form id="settingsForm">
+            <div class="form-group">
+              <label>Business Email</label>
+              <input type="email" id="businessEmail" value="hello@sovereignprints.co.za">
+            </div>
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="tel" id="businessPhone" value="+27 (0) 12 345 6789">
+            </div>
+            <div class="form-group">
+              <label>WhatsApp Number</label>
+              <input type="tel" id="whatsappNumber" value="27123456789">
+            </div>
+            <div class="form-group">
+              <label>Address</label>
+              <textarea id="businessAddress" rows="3">Johannesburg, South Africa</textarea>
+            </div>
+
+            <h2>Security</h2>
+            <div class="form-group">
+              <label>Admin Password</label>
+              <input type="password" id="newPassword" placeholder="Leave blank to keep current password">
+            </div>
+            <div class="form-group">
+              <label>Confirm Password</label>
+              <input type="password" id="confirmPassword">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Quote Detail Modal -->
+  <div id="quoteDetailModal" class="modal">
+    <div class="modal-content wide">
+      <span class="close">&times;</span>
+      <h2>Quote Details</h2>
+      <div id="quoteDetailContent">
+        <!-- Populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

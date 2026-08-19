@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products & Pricing — Sovereign Prints</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="navbar-brand">
+        <h1>Sovereign Prints</h1>
+        <p class="tagline">You bring it. We brand it.</p>
+      </div>
+      <ul class="nav-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="products.html" class="active">Products & Pricing</a></li>
+        <li><a href="gallery.html">Gallery</a></li>
+        <li><a href="quote.html">Get a Quote</a></li>
+        <li><a href="admin.html" class="admin-link">Admin</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <h1>Products & Pricing</h1>
+      <p>Browse our services and see starting prices. For custom jobs, request a quote.</p>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="filters-section">
+    <div class="container">
+      <div class="filters">
+        <button class="filter-btn active" data-category="all">All Products</button>
+        <div id="categoryFilters">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Products Grid -->
+  <section class="products-section">
+    <div class="container">
+      <div class="products-grid" id="productsGrid">
+        <!-- Populated by JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Product Detail Modal -->
+  <div id="productModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="modal-body">
+        <div class="product-image">
+          <div class="placeholder-image">Product Image</div>
+        </div>
+        <div class="product-details">
+          <h2 id="modalProductName"></h2>
+          <p id="modalProductDescription"></p>
+
+          <div class="pricing-table">
+            <h3>Pricing</h3>
+            <table id="pricingTable">
+              <!-- Populated by JavaScript -->
+            </table>
+          </div>
+
+          <div class="product-specs">
+            <h3>Specifications</h3>
+            <p id="modalProductSpecs"></p>
+            <p><strong>Turnaround:</strong> <span id="modalProductTurnaround"></span> days</p>
+          </div>
+
+          <div class="modal-actions">
+            <a href="quote.html" class="btn btn-primary">Request Custom Quote</a>
+            <button class="btn btn-secondary close-modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Contact</h3>
+          <p>📞 +27 (0) 12 345 6789</p>
+          <p>✉️ hello@sovereignprints.co.za</p>
+          <p>📍 Johannesburg, South Africa</p>
+        </div>
+        <div class="footer-section">
+          <h3>Quick Links</h3>
+          <ul>
+            <li><a href="products.html">Products</a></li>
+            <li><a href="gallery.html">Gallery</a></li>
+            <li><a href="quote.html">Quote</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 Sovereign Prints. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script src="products.js"></script>
+</body>
+</html>

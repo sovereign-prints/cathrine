@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get a Quote — Sovereign Prints</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="navbar-brand">
+        <h1>Sovereign Prints</h1>
+        <p class="tagline">You bring it. We brand it.</p>
+      </div>
+      <ul class="nav-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="products.html">Products & Pricing</a></li>
+        <li><a href="gallery.html">Gallery</a></li>
+        <li><a href="quote.html" class="active">Get a Quote</a></li>
+        <li><a href="admin.html" class="admin-link">Admin</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <h1>Get a Quote</h1>
+      <p>Tell us what you need and we'll get back to you within 24 hours.</p>
+    </div>
+  </section>
+
+  <!-- Quote Form -->
+  <section class="quote-section">
+    <div class="container">
+      <div class="quote-form-wrapper">
+        <form id="quoteForm" class="quote-form">
+          <div class="form-group">
+            <label for="customerName">Your Name *</label>
+            <input type="text" id="customerName" name="customerName" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="customerEmail">Email Address *</label>
+              <input type="email" id="customerEmail" name="customerEmail" required>
+            </div>
+            <div class="form-group">
+              <label for="customerPhone">Phone Number</label>
+              <input type="tel" id="customerPhone" name="customerPhone">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="service">What service do you need? *</label>
+            <select id="service" name="service" required>
+              <option value="">-- Select a service --</option>
+              <option value="Clothing">Clothing Branding</option>
+              <option value="Vinyl">Vinyl Decals & Graphics</option>
+              <option value="Vehicle Branding">Vehicle Branding</option>
+              <option value="Glass & Mugs">Glass & Mugs</option>
+              <option value="Signage">Signage</option>
+              <option value="Printing">Printing</option>
+              <option value="Other">Something Else</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="description">Tell us about your project *</label>
+            <textarea id="description" name="description" rows="5" placeholder="What do you need? Who is it for? Any special requirements?" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="requirements">What should we include in the quote?</label>
+            <div class="checkbox-group">
+              <label><input type="checkbox" name="requirements" value="Design"> Design assistance (if you don't have artwork)</label>
+              <label><input type="checkbox" name="requirements" value="Delivery"> Shipping/Delivery</label>
+              <label><input type="checkbox" name="requirements" value="Installation"> Installation/Application</label>
+              <label><input type="checkbox" name="requirements" value="Express"> Rush/Express Timeline</label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-large">Submit Quote Request</button>
+        </form>
+
+        <div id="quoteSuccess" class="success-message" style="display: none;">
+          <h3>✓ Quote request received!</h3>
+          <p>Your quote reference number is: <strong id="referenceNumber"></strong></p>
+          <p>We'll respond to <span id="confirmEmail"></span> within 24 hours.</p>
+          <p>You can check the status of your quote using your reference number.</p>
+          <a href="index.html" class="btn btn-secondary">Back to Home</a>
+        </div>
+      </div>
+
+      <!-- Info Box -->
+      <div class="info-box">
+        <h3>What happens next?</h3>
+        <ol>
+          <li>We review your requirements</li>
+          <li>We send you a detailed quote via email</li>
+          <li>You confirm and we start production</li>
+          <li>You receive updates on your project</li>
+          <li>We deliver or arrange pickup</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Contact</h3>
+          <p>📞 +27 (0) 12 345 6789</p>
+          <p>✉️ hello@sovereignprints.co.za</p>
+          <p>📍 Johannesburg, South Africa</p>
+        </div>
+        <div class="footer-section">
+          <h3>Need Help?</h3>
+          <p>Can't wait for a quote? Chat with us on WhatsApp:</p>
+          <a href="https://wa.me/27123456789" class="btn btn-whatsapp btn-small">WhatsApp</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 Sovereign Prints. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script src="quote.js"></script>
+</body>
+</html>
