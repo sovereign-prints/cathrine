@@ -10,7 +10,48 @@ document.addEventListener('DOMContentLoaded', () => {
   loadProducts();
   loadCategories();
   loadServices();
+  initializeHamburger();
 });
+
+// ============ HAMBURGER MENU ============
+
+function initializeHamburger() {
+  const hamburger = document.getElementById('hamburger');
+  const navMenu = document.getElementById('navMenu');
+
+  if (!hamburger || !navMenu) return;
+
+  // Toggle menu when hamburger is clicked
+  hamburger.addEventListener('click', () => {
+    hamburger.classList.toggle('active');
+    navMenu.classList.toggle('show');
+  });
+
+  // Close menu when a link is clicked
+  const navLinks = navMenu.querySelectorAll('a');
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      hamburger.classList.remove('active');
+      navMenu.classList.remove('show');
+    });
+  });
+
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.navbar')) {
+      hamburger.classList.remove('active');
+      navMenu.classList.remove('show');
+    }
+  });
+
+  // Close menu on window resize (when switching to desktop)
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+      hamburger.classList.remove('active');
+      navMenu.classList.remove('show');
+    }
+  });
+}
 
 // ============ API CALLS ============
 

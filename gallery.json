@@ -1,0 +1,152 @@
+[
+  {
+    "id": 13428,
+    "title": "T-Shirt Branding",
+    "category": "Clothing",
+    "description": "Custom branded t-shirts for team events and promotions",
+    "imageUrl": "/uploads/gallery-01-clothing.png",
+    "order": 1,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216817"
+  },
+  {
+    "id": 23428,
+    "title": "Business Card Design",
+    "category": "Printing",
+    "description": "Professional business cards with premium finishes",
+    "imageUrl": "/uploads/gallery-02-printing.png",
+    "order": 2,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216827"
+  },
+  {
+    "id": 33428,
+    "title": "Vehicle Branding",
+    "category": "Vehicle Branding",
+    "description": "Complete vehicle wrap and graphics design",
+    "imageUrl": "/uploads/gallery-03-vehicle-branding.png",
+    "order": 3,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216831"
+  },
+  {
+    "id": 43428,
+    "title": "Signage & Displays",
+    "category": "Signage",
+    "description": "Custom storefront and promotional signage",
+    "imageUrl": "/uploads/gallery-04-signage.png",
+    "order": 4,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216834"
+  },
+  {
+    "id": 53428,
+    "title": "Promotional Merchandise",
+    "category": "Promotional Items",
+    "description": "Branded pens, mugs, and promotional products",
+    "imageUrl": "/uploads/gallery-05-promotional-items.png",
+    "order": 5,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216837"
+  },
+  {
+    "id": 63428,
+    "title": "Logo Design & Branding",
+    "category": "Custom",
+    "description": "Complete brand identity and logo design packages",
+    "imageUrl": "/uploads/gallery-06-custom.png",
+    "order": 6,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216841"
+  },
+  {
+    "id": 73428,
+    "title": "Product Packaging",
+    "category": "Printing",
+    "description": "Custom boxes and packaging design for products",
+    "imageUrl": "/uploads/gallery-07-printing.png",
+    "order": 7,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216844"
+  },
+  {
+    "id": 83428,
+    "title": "Event Banners",
+    "category": "Signage",
+    "description": "Large format banners for conferences and events",
+    "imageUrl": "/uploads/gallery-08-signage.png",
+    "order": 8,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216850"
+  },
+  {
+    "id": 93428,
+    "title": "Custom Labels",
+    "category": "Printing",
+    "description": "Product labels and sticker design services",
+    "imageUrl": "/uploads/gallery-09-printing.png",
+    "order": 9,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216854"
+  },
+  {
+    "id": 103428,
+    "title": "Flyer Design & Printing",
+    "category": "Printing",
+    "description": "Eye-catching flyers for marketing campaigns",
+    "imageUrl": "/uploads/gallery-10-printing.png",
+    "order": 10,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216857"
+  },
+  {
+    "id": 113428,
+    "title": "Polo Shirt Embroidery",
+    "category": "Clothing",
+    "description": "Professional embroidered corporate wear",
+    "imageUrl": "/uploads/gallery-11-clothing.png",
+    "order": 11,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216860"
+  },
+  {
+    "id": 123428,
+    "title": "Custom Posters",
+    "category": "Signage",
+    "description": "Premium poster printing and framing options",
+    "imageUrl": "/uploads/gallery-12-signage.png",
+    "order": 12,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216863"
+  },
+  {
+    "id": 133428,
+    "title": "Die-Cut Stickers",
+    "category": "Printing",
+    "description": "Custom shaped stickers and decals",
+    "imageUrl": "/uploads/gallery-13-printing.png",
+    "order": 13,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216866"
+  },
+  {
+    "id": 143428,
+    "title": "Corporate Branding",
+    "category": "Custom",
+    "description": "Complete corporate identity and brand guidelines",
+    "imageUrl": "/uploads/gallery-14-custom.png",
+    "order": 14,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216869"
+  },
+  {
+    "id": 153428,
+    "title": "Event Merchandise",
+    "category": "Promotional Items",
+    "description": "Custom merchandise for conferences and trade shows",
+    "imageUrl": "/uploads/gallery-15-promotional-items.png",
+    "order": 15,
+    "active": true,
+    "createdAt": "2026-08-19T18:17:08.216871"
+  }
+]
