@@ -1,0 +1,425 @@
+<!--
+TEMPLATE MANAGEMENT TAB - ADD TO admin.html
+
+Insert this entire section into your admin.html file as a new tab.
+This provides the UI for managing templates.
+-->
+
+<!-- ADD THIS TO YOUR TAB NAVIGATION -->
+<button class="tab-button" onclick="switchTab('templates-tab')">
+    📄 Templates
+</button>
+
+<!-- ADD THIS TO YOUR TAB CONTENT AREA -->
+<div id="templates-tab" class="tab-content" style="display:none;">
+    <div class="tab-inner">
+        <div class="section-header">
+            <h2>Template Management</h2>
+            <p>Create and manage quote and invoice templates for your business</p>
+        </div>
+
+        <!-- FILTER TABS -->
+        <div class="template-filters">
+            <button class="filter-btn active" onclick="loadTemplates(); this.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active');">
+                All Templates
+            </button>
+            <button class="filter-btn" onclick="loadTemplates('quote'); this.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active');">
+                Quote Templates
+            </button>
+            <button class="filter-btn" onclick="loadTemplates('invoice'); this.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active');">
+                Invoice Templates
+            </button>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="section-actions">
+            <button class="btn btn-primary" onclick="newTemplate()">
+                ➕ New Template
+            </button>
+        </div>
+
+        <!-- TEMPLATES LIST -->
+        <div id="templates-list" class="templates-list">
+            <p style="text-align: center; color: #999;">Loading templates...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ADD THIS CSS TO your stylesheet -->
+<style>
+    /* TEMPLATES TAB STYLING */
+
+    .templates-list {
+        display: grid;
+        gap: 15px;
+    }
+
+    .template-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: center;
+        padding: 15px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .template-row:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .template-info {
+        flex: 1;
+    }
+
+    .template-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 8px;
+    }
+
+    .template-meta {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 13px;
+        color: #7f8c8d;
+    }
+
+    .template-type {
+        display: inline-block;
+        background: #ecf0f1;
+        color: #2c3e50;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .badge-default {
+        display: inline-block;
+        background: #27ae60;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+    }
+
+    .template-created {
+        font-size: 12px;
+        color: #95a5a6;
+    }
+
+    .template-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .template-filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 8px 16px;
+        background: #ecf0f1;
+        border: 1px solid #bdc3c7;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: #2c3e50;
+        transition: all 0.2s ease;
+    }
+
+    .filter-btn:hover {
+        background: #d5dbdb;
+    }
+
+    .filter-btn.active {
+        background: #3498db;
+        color: white;
+        border-color: #3498db;
+    }
+
+    .section-actions {
+        margin-bottom: 20px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #95a5a6;
+        font-style: italic;
+    }
+
+    /* MODAL STYLING */
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        overflow-y: auto;
+    }
+
+    .modal-content {
+        background: white;
+        margin: 20px auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #ecf0f1;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 20px;
+        color: #2c3e50;
+    }
+
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #7f8c8d;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-close:hover {
+        background: #ecf0f1;
+        color: #2c3e50;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid #ecf0f1;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .modal-footer .btn {
+        padding: 10px 20px;
+    }
+
+    /* FORM STYLING */
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #bdc3c7;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 14px;
+        transition: border-color 0.2s ease;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        font-family: 'Courier New', monospace;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .template-row {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .template-actions {
+            flex-direction: column;
+        }
+
+        .btn-sm {
+            width: 100%;
+            text-align: center;
+        }
+
+        .modal-content {
+            width: 95%;
+            max-height: 95vh;
+        }
+    }
+
+    /* ALERTS */
+
+    .alert {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 4px;
+        font-weight: 500;
+        z-index: 2000;
+        animation: slideIn 0.3s ease;
+    }
+
+    .alert-success {
+        background: #27ae60;
+        color: white;
+    }
+
+    .alert-error {
+        background: #e74c3c;
+        color: white;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    /* BUTTONS */
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #7f8c8d;
+    }
+
+    .btn-info {
+        background: #3498db;
+        color: white;
+    }
+
+    .btn-info:hover {
+        background: #2980b9;
+    }
+
+    .btn-danger {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c0392b;
+    }
+</style>
+
+<!--
+INTEGRATION INSTRUCTIONS:
+
+1. Add the template tab button to your admin.html tab navigation section
+   (Usually in a <div class="tabs"> or <nav class="tabs"> area)
+
+2. Add the templates-tab content div to your tab content area
+   (Usually after your other tab content divs)
+
+3. Add the CSS to your public/admin.css file
+
+4. Add the JavaScript functions by either:
+   a) Pasting template-admin-ui.js into your public/admin.js file, OR
+   b) Creating a new file public/templates-admin.js and including it in admin.html
+
+5. Make sure to call loadTemplates() when the admin page loads
+   (Add to your admin.js initialization code)
+
+Example in admin.html head:
+    <script src="templates-admin.js"></script>
+
+Or add at bottom of admin.js:
+    // Initialize templates when admin page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadTemplates);
+    } else {
+        loadTemplates();
+    }
+-->
