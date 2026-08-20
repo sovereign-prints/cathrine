@@ -40,6 +40,7 @@ dirs.forEach(dir => {
 const dataDir = 'data';
 const productsFile = path.join(dataDir, 'products.json');
 const quotesFile = path.join(dataDir, 'quotes.json');
+const galleryFile = path.join(dataDir, 'gallery.json');
 
 // Initialize data files
 function initializeData() {
@@ -79,6 +80,11 @@ function initializeData() {
     fs.writeFileSync(quotesFile, JSON.stringify([], null, 2));
     console.log('Quotes data initialized');
   }
+
+  if (!fs.existsSync(galleryFile)) {
+    fs.writeFileSync(galleryFile, JSON.stringify([], null, 2));
+    console.log('Gallery data initialized');
+  }
 }
 
 // Helper functions to read/write data
@@ -100,6 +106,18 @@ function readQuotes() {
 
 function saveQuotes(quotes) {
   fs.writeFileSync(quotesFile, JSON.stringify(quotes, null, 2));
+}
+
+function readGallery() {
+  try {
+    return JSON.parse(fs.readFileSync(galleryFile, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveGallery(gallery) {
+  fs.writeFileSync(galleryFile, JSON.stringify(gallery, null, 2));
 }
 
 // Initialize data
@@ -403,6 +421,100 @@ app.patch('/api/admin/pricing/:tierId', adminAuth, (req, res) => {
     }
 
     res.status(404).json({ error: 'Pricing tier not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ GALLERY ROUTES ============
+
+// Get all gallery items (admin)
+app.get('/api/admin/gallery', adminAuth, (req, res) => {
+  try {
+    const gallery = readGallery();
+    res.json(gallery);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Upload gallery image
+app.post('/api/admin/gallery', adminAuth, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { title, category, description } = req.body;
+    const filename = Date.now() + path.extname(req.file.originalname);
+    const filepath = path.join('uploads', filename);
+    fs.renameSync(req.file.path, filepath);
+
+    const gallery = readGallery();
+    const newItem = {
+      id: Date.now(),
+      title: title || 'Untitled',
+      category: category || 'General',
+      description: description || '',
+      imageUrl: `/uploads/${filename}`,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+
+    gallery.push(newItem);
+    saveGallery(gallery);
+
+    res.json({ success: true, item: newItem });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update gallery item
+app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), (req, res) => {
+  try {
+    const { title, category, description, active } = req.body;
+    const gallery = readGallery();
+    const item = gallery.find(g => g.id === parseInt(req.params.id));
+
+    if (!item) {
+      return res.status(404).json({ error: 'Gallery item not found' });
+    }
+
+    // Update image if a new one was uploaded
+    if (req.file) {
+      const filename = Date.now() + path.extname(req.file.originalname);
+      const filepath = path.join('uploads', filename);
+      fs.renameSync(req.file.path, filepath);
+      item.imageUrl = `/uploads/${filename}`;
+    }
+
+    // Update other fields
+    if (title) item.title = title;
+    if (category) item.category = category;
+    if (description !== undefined) item.description = description;
+    if (active !== undefined) item.active = active === 'true' || active === true;
+
+    saveGallery(gallery);
+    res.json({ success: true, item });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete gallery item
+app.delete('/api/admin/gallery/:id', adminAuth, (req, res) => {
+  try {
+    let gallery = readGallery();
+    const itemIndex = gallery.findIndex(g => g.id === parseInt(req.params.id));
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ error: 'Gallery item not found' });
+    }
+
+    gallery.splice(itemIndex, 1);
+    saveGallery(gallery);
+    res.json({ success: true, message: 'Gallery item deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
