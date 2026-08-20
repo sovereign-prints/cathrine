@@ -5,6 +5,143 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Products & Pricing — Sovereign Prints</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .products-section {
+      padding: 60px 0;
+      background: #f8f9fa;
+    }
+
+    .category-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 40px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .category-tab {
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .category-tab:hover {
+      color: #4f46e5;
+    }
+
+    .category-tab.active {
+      color: #4f46e5;
+      border-bottom-color: #4f46e5;
+    }
+
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 30px;
+      margin-top: 40px;
+    }
+
+    .product-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+
+    .product-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+
+    .product-image {
+      width: 100%;
+      height: 280px;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .product-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-image .placeholder-image {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .product-info {
+      padding: 20px;
+    }
+
+    .product-info h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #1f2937;
+    }
+
+    .product-info p {
+      margin: 0 0 15px 0;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .product-price {
+      font-size: 18px;
+      font-weight: 600;
+      color: #4f46e5;
+      margin-bottom: 15px;
+    }
+
+    .btn-view {
+      width: 100%;
+      padding: 10px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.3s ease;
+    }
+
+    .btn-view:hover {
+      background: #4338ca;
+    }
+
+    @media (max-width: 768px) {
+      .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+      }
+
+      .category-tabs {
+        gap: 8px;
+      }
+
+      .category-tab {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Navigation -->
@@ -49,21 +186,16 @@
     </div>
   </section>
 
-  <!-- Filters -->
-  <section class="filters-section">
-    <div class="container">
-      <div class="filters">
-        <button class="filter-btn active" data-category="all">All Products</button>
-        <div id="categoryFilters">
-          <!-- Populated by JavaScript -->
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Products Grid -->
+  <!-- Products Section with Category Tabs -->
   <section class="products-section">
     <div class="container">
+      <!-- Category Tabs -->
+      <div class="category-tabs" id="categoryTabs">
+        <button class="category-tab active" data-category="all">All Products</button>
+        <!-- Additional categories populated by JavaScript -->
+      </div>
+
+      <!-- Products Grid -->
       <div class="products-grid" id="productsGrid">
         <!-- Populated by JavaScript -->
       </div>
@@ -76,7 +208,8 @@
       <span class="close">&times;</span>
       <div class="modal-body">
         <div class="product-image">
-          <div class="placeholder-image">Product Image</div>
+          <img id="modalProductImage" src="" alt="Product" style="display:none;">
+          <div id="modalPlaceholderImage" class="placeholder-image">Product Image</div>
         </div>
         <div class="product-details">
           <h2 id="modalProductName"></h2>
@@ -130,6 +263,6 @@
   </footer>
 
   <script src="app.js"></script>
-  <script src="products.js"></script>
+  <script src="products-improved.js"></script>
 </body>
 </html>

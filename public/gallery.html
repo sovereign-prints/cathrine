@@ -5,6 +5,254 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gallery — Sovereign Prints</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .gallery-section {
+      padding: 60px 0;
+      background: #f8f9fa;
+    }
+
+    .category-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 40px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .category-tab {
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .category-tab:hover {
+      color: #4f46e5;
+    }
+
+    .category-tab.active {
+      color: #4f46e5;
+      border-bottom-color: #4f46e5;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 30px;
+      margin-top: 40px;
+    }
+
+    .gallery-item {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+
+    .gallery-item:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+
+    .gallery-image {
+      width: 100%;
+      height: 280px;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .gallery-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .gallery-image .placeholder-image {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .gallery-info {
+      padding: 20px;
+    }
+
+    .gallery-info h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #1f2937;
+    }
+
+    .gallery-info p {
+      margin: 0 0 15px 0;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .gallery-category {
+      display: inline-block;
+      font-size: 12px;
+      color: #4f46e5;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .btn-view {
+      width: 100%;
+      padding: 10px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.3s ease;
+    }
+
+    .btn-view:hover {
+      background: #4338ca;
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox.show {
+      display: flex;
+    }
+
+    .lightbox-content {
+      position: relative;
+      max-width: 90%;
+      max-height: 90%;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .lightbox-image {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      margin-bottom: 15px;
+    }
+
+    .lightbox-info h2 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: #1f2937;
+    }
+
+    .lightbox-info p {
+      margin: 0 0 15px 0;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .lightbox-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .lightbox-actions a {
+      flex: 1;
+      padding: 12px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      font-weight: 500;
+      transition: background 0.3s ease;
+    }
+
+    .lightbox-actions a:hover {
+      background: #4338ca;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 32px;
+      cursor: pointer;
+      color: #1f2937;
+      background: none;
+      border: none;
+      padding: 5px 10px;
+    }
+
+    .lightbox-close:hover {
+      color: #4f46e5;
+    }
+
+    @media (max-width: 768px) {
+      .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+      }
+
+      .category-tabs {
+        gap: 8px;
+      }
+
+      .category-tab {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+
+      .lightbox-content {
+        max-width: 95%;
+        padding: 15px;
+      }
+
+      .lightbox-image {
+        max-height: 50vh;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Navigation -->
@@ -44,24 +292,41 @@
   <!-- Page Header -->
   <section class="page-header">
     <div class="container">
-      <h1>Our Work</h1>
-      <p>Browse some of our recent projects and custom jobs.</p>
+      <h1>Gallery</h1>
+      <p>See examples of our work across all service categories.</p>
     </div>
   </section>
 
-  <!-- Coming Soon -->
+  <!-- Gallery Section with Category Tabs -->
   <section class="gallery-section">
     <div class="container">
-      <div class="coming-soon">
-        <h2>Gallery Coming Soon</h2>
-        <p>We're building our project showcase. In the meantime, check out our products or request a quote to see what we can do for you.</p>
-        <div class="cta-buttons">
-          <a href="products.html" class="btn btn-primary">Browse Products</a>
-          <a href="quote.html" class="btn btn-secondary">Get a Quote</a>
-        </div>
+      <!-- Category Tabs -->
+      <div class="category-tabs" id="categoryTabs">
+        <button class="category-tab active" data-category="all">All Gallery</button>
+        <!-- Additional categories populated by JavaScript -->
+      </div>
+
+      <!-- Gallery Grid -->
+      <div class="gallery-grid" id="galleryGrid">
+        <!-- Populated by JavaScript -->
       </div>
     </div>
   </section>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+      <button class="lightbox-close" id="lightboxClose">&times;</button>
+      <img id="lightboxImage" src="" alt="Gallery Image" class="lightbox-image">
+      <div class="lightbox-info">
+        <h2 id="lightboxTitle"></h2>
+        <p id="lightboxDescription"></p>
+        <div class="lightbox-actions">
+          <a href="quote.html">Request a Quote</a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="footer">
@@ -89,5 +354,6 @@
   </footer>
 
   <script src="app.js"></script>
+  <script src="gallery-improved.js"></script>
 </body>
 </html>

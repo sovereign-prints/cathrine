@@ -2,8 +2,8 @@ name: Keep cathrine.onrender.com alive
 
 on:
   schedule:
-    # Run every hour at minute 0
-    - cron: '0 * * * *'
+    # Run every 14 minutes (Render needs ping within ~15 min window)
+    - cron: '*/14 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -15,14 +15,15 @@ jobs:
           TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           echo "[$TIMESTAMP] Pinging https://cathrine.onrender.com/"
 
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://cathrine.onrender.com/)
+          # Increase timeout to 30 seconds for slow Render instances
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 https://cathrine.onrender.com/)
 
           echo "[$TIMESTAMP] Response status: $STATUS"
 
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "301" ] || [ "$STATUS" = "302" ]; then
-            echo "✓ Keepalive successful"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "301" ] || [ "$STATUS" = "302" ] || [ "$STATUS" = "404" ]; then
+            echo "✓ Keepalive successful (Status: $STATUS)"
             exit 0
           else
-            echo "⚠ Unexpected status code: $STATUS"
-            exit 0
+            echo "❌ Ping failed with status: $STATUS"
+            exit 1
           fi

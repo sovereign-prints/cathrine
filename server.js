@@ -120,6 +120,10 @@ function saveGallery(gallery) {
   fs.writeFileSync(galleryFile, JSON.stringify(gallery, null, 2));
 }
 
+function saveProducts(products) {
+  fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+}
+
 // Initialize data
 initializeData();
 
@@ -533,6 +537,64 @@ app.post('/api/admin/upload', adminAuth, upload.single('image'), (req, res) => {
       filename: filename,
       url: `/uploads/${filename}`
     });
+  }
+});
+
+// ============ PRODUCT IMAGE ENDPOINTS ============
+
+// Upload image for specific product
+app.post('/api/admin/product-image', adminAuth, upload.single('image'), (req, res) => {
+  try {
+    const { productId } = req.body;
+
+    if (!productId || !req.file) {
+      return res.status(400).json({ error: 'Product ID and image required' });
+    }
+
+    const products = readProducts();
+    const product = products.find(p => p.id === parseInt(productId));
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Save uploaded file
+    const filename = Date.now() + path.extname(req.file.originalname);
+    const filepath = path.join('uploads', filename);
+    fs.renameSync(req.file.path, filepath);
+
+    // Update product with image path
+    product.image = `/uploads/${filename}`;
+    saveProducts(products);
+
+    res.json({
+      success: true,
+      productId: product.id,
+      imagePath: product.image
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ PUBLIC GALLERY ENDPOINT ============
+
+// Get active gallery items (public)
+app.get('/api/gallery', (req, res) => {
+  try {
+    const gallery = readGallery();
+    // Filter to active items and use 'image' field instead of 'imageUrl'
+    const activeGallery = gallery
+      .filter(item => item.active !== false)
+      .map(item => ({
+        ...item,
+        image: item.image || item.imageUrl  // Support both field names
+      }))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    res.json(activeGallery);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
