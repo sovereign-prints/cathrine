@@ -1,0 +1,28 @@
+name: Keep cathrine.onrender.com alive
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping cathrine.onrender.com
+        run: |
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          echo "[$TIMESTAMP] Pinging https://cathrine.onrender.com/"
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://cathrine.onrender.com/)
+
+          echo "[$TIMESTAMP] Response status: $STATUS"
+
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "301" ] || [ "$STATUS" = "302" ]; then
+            echo "✓ Keepalive successful"
+            exit 0
+          else
+            echo "⚠ Unexpected status code: $STATUS"
+            exit 0
+          fi
