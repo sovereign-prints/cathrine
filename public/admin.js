@@ -4,6 +4,8 @@ const API_BASE = '/api';
 let authToken = null;
 let adminProducts = [];
 let adminQuotes = [];
+let currentEditingImageId = null;
+let editImageFileSelected = false;
 
 // ============ INITIALIZATION ============
 
@@ -70,6 +72,7 @@ function showDashboard() {
   loadDashboardStats();
   loadAdminQuotes();
   loadAdminProducts();
+  setupGalleryUpload();
 }
 
 // ============ LOGOUT ============
@@ -104,6 +107,8 @@ function setupTabNavigation() {
         loadAdminQuotes();
       } else if (tabName === 'products') {
         loadAdminProducts();
+      } else if (tabName === 'gallery') {
+        loadGalleryItems();
       } else if (tabName === 'pricing') {
         loadPricingPage();
       }
@@ -414,6 +419,355 @@ async function deleteProduct(productId) {
   }
 }
 
+// ============ GALLERY MANAGEMENT ============
+
+function setupGalleryUpload() {
+  const uploadArea = document.getElementById('gallery-upload-area');
+  const fileInput = document.getElementById('gallery-image-input');
+  const addBtn = document.getElementById('addGalleryImageBtn');
+
+  if (!uploadArea || !fileInput) return;
+
+  // Show upload form when clicking add button
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      document.getElementById('gallery-upload-section').style.display = 'block';
+      uploadArea.classList.add('active');
+    });
+  }
+
+  // Click to select
+  uploadArea.addEventListener('click', () => fileInput.click());
+
+  // Drag & drop
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files;
+    updateFilePreview();
+  });
+
+  // File input change
+  fileInput.addEventListener('change', updateFilePreview);
+
+  // Form submission
+  const uploadForm = document.getElementById('gallery-upload-form');
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await uploadGalleryImage();
+    });
+  }
+}
+
+function updateFilePreview() {
+  const fileInput = document.getElementById('gallery-image-input');
+  const previewArea = document.getElementById('gallery-file-preview-area');
+  const uploadForm = document.getElementById('gallery-upload-form');
+
+  if (fileInput.files && fileInput.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewArea.innerHTML = `
+        <div style="display: inline-block;">
+          <p style="color: #666; margin: 0 0 10px 0; font-weight: 600;">Image preview:</p>
+          <img src="${e.target.result}" alt="Preview" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;" />
+          <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">${fileInput.files[0].name}</p>
+        </div>
+      `;
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+    uploadForm.style.display = 'block';
+  }
+}
+
+async function uploadGalleryImage() {
+  const fileInput = document.getElementById('gallery-image-input');
+  const title = document.getElementById('gallery-upload-title').value.trim();
+  const category = document.getElementById('gallery-upload-category').value;
+  const description = document.getElementById('gallery-upload-description').value.trim();
+
+  if (!title) {
+    alert('Please enter an image title');
+    return;
+  }
+
+  if (!fileInput.files[0]) {
+    alert('Please select an image');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+    formData.append('title', title);
+    formData.append('category', category);
+    formData.append('description', description);
+
+    const response = await fetch(`${API_BASE}/admin/gallery`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      alert('Error uploading image: ' + (error.error || 'Unknown error'));
+      return;
+    }
+
+    alert('Image uploaded successfully!');
+    cancelGalleryUpload();
+    loadGalleryItems();
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    alert('Error uploading image: ' + error.message);
+  }
+}
+
+function cancelGalleryUpload() {
+  document.getElementById('gallery-image-input').value = '';
+  document.getElementById('gallery-upload-title').value = '';
+  document.getElementById('gallery-upload-category').value = 'General';
+  document.getElementById('gallery-upload-description').value = '';
+  document.getElementById('gallery-file-preview-area').innerHTML = '';
+  document.getElementById('gallery-upload-form').style.display = 'none';
+  document.getElementById('gallery-upload-section').style.display = 'none';
+}
+
+async function loadGalleryItems() {
+  const container = document.getElementById('gallery-items-container');
+  const empty = document.getElementById('gallery-empty');
+  const loading = document.getElementById('gallery-loading');
+  const itemsList = document.getElementById('gallery-items-list');
+
+  if (!container) return;
+
+  loading.style.display = 'block';
+  container.style.display = 'none';
+  empty.style.display = 'none';
+
+  try {
+    const response = await adminFetch('/admin/gallery');
+    const items = response;
+
+    loading.style.display = 'none';
+
+    if (!items || items.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+
+    container.style.display = 'block';
+    itemsList.innerHTML = items.map(item => `
+      <div class="gallery-item" data-id="${item.id}">
+        <span class="drag-handle">⋮⋮</span>
+        <img src="${item.imageUrl}" alt="${item.title}" class="gallery-item-thumbnail" />
+        <div class="gallery-item-details">
+          <div class="gallery-item-title">${item.title}</div>
+          <div class="gallery-item-category">${item.category}</div>
+          <div class="gallery-item-description" style="font-size: 0.85em; color: #666; margin-top: 5px; line-height: 1.4;">
+            ${item.description ? item.description.substring(0, 60) + (item.description.length > 60 ? '...' : '') : 'No description'}
+          </div>
+          <div class="gallery-item-status ${item.active ? 'active' : 'inactive'}">
+            ${item.active ? '✓ Active' : '✕ Inactive'}
+          </div>
+        </div>
+        <div class="gallery-item-actions">
+          <button type="button" class="btn btn-sm btn-edit" onclick="openEditModal(${item.id}, '${item.title.replace(/'/g, "\\'")}', '${item.category}', '${(item.description || '').replace(/'/g, "\\'")}', '${item.imageUrl}')">
+            ✏️ Edit
+          </button>
+          <button type="button" class="btn btn-sm" onclick="toggleGalleryItemActive(${item.id}, ${!item.active})">
+            ${item.active ? 'Hide' : 'Show'}
+          </button>
+          <button type="button" class="btn btn-sm btn-danger" onclick="deleteGalleryItem(${item.id})">
+            🗑️ Delete
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading gallery:', error);
+    loading.style.display = 'none';
+    empty.style.display = 'block';
+  }
+}
+
+function openEditModal(imageId, title, category, description, imageUrl) {
+  currentEditingImageId = imageId;
+  editImageFileSelected = false;
+
+  document.getElementById('edit-image-id').value = imageId;
+  document.getElementById('edit-image-title').value = title;
+  document.getElementById('edit-image-category').value = category;
+  document.getElementById('edit-image-description').value = description;
+  document.getElementById('edit-image-preview').src = imageUrl;
+  document.getElementById('edit-gallery-image-input').value = '';
+  document.getElementById('edit-file-preview-area').innerHTML = '';
+
+  const modal = document.getElementById('edit-image-modal');
+  modal.classList.add('show');
+
+  setupEditFileUpload();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+  const modal = document.getElementById('edit-image-modal');
+  modal.classList.remove('show');
+  document.body.style.overflow = 'auto';
+  currentEditingImageId = null;
+  editImageFileSelected = false;
+}
+
+function setupEditFileUpload() {
+  const uploadArea = document.getElementById('edit-file-upload-area');
+  const fileInput = document.getElementById('edit-gallery-image-input');
+  const previewArea = document.getElementById('edit-file-preview-area');
+
+  if (!uploadArea) return;
+
+  // Click to select
+  uploadArea.addEventListener('click', () => fileInput.click());
+
+  // Drag & drop
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files;
+    updateEditFilePreview();
+  });
+
+  // File input change
+  fileInput.addEventListener('change', updateEditFilePreview);
+}
+
+function updateEditFilePreview() {
+  const fileInput = document.getElementById('edit-gallery-image-input');
+  const previewArea = document.getElementById('edit-file-preview-area');
+
+  if (fileInput.files && fileInput.files[0]) {
+    editImageFileSelected = true;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewArea.innerHTML = `
+        <div style="display: inline-block;">
+          <p style="color: #666; margin: 0 0 10px 0;">New image preview:</p>
+          <img src="${e.target.result}" alt="New Preview" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;" />
+          <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">${fileInput.files[0].name}</p>
+        </div>
+      `;
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else {
+    editImageFileSelected = false;
+    previewArea.innerHTML = '';
+  }
+}
+
+async function saveEditedImage() {
+  const imageId = document.getElementById('edit-image-id').value;
+  const title = document.getElementById('edit-image-title').value.trim();
+  const category = document.getElementById('edit-image-category').value;
+  const description = document.getElementById('edit-image-description').value.trim();
+  const fileInput = document.getElementById('edit-gallery-image-input');
+
+  if (!title) {
+    alert('Please enter a title');
+    return;
+  }
+
+  try {
+    // If a new image was selected, upload it first
+    if (editImageFileSelected && fileInput.files[0]) {
+      const formData = new FormData();
+      formData.append('image', fileInput.files[0]);
+      formData.append('title', title);
+      formData.append('category', category);
+      formData.append('description', description);
+
+      const uploadResponse = await fetch(`${API_BASE}/admin/gallery/${imageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        alert('Error updating image: ' + (error.error || 'Unknown error'));
+        return;
+      }
+    } else {
+      // Just update the text fields
+      const response = await adminFetch(`/admin/gallery/${imageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title,
+          category,
+          description
+        })
+      });
+    }
+
+    alert('Image updated successfully!');
+    closeEditModal();
+    loadGalleryItems();
+  } catch (error) {
+    console.error('Error updating image:', error);
+    alert('Error updating image: ' + error.message);
+  }
+}
+
+async function toggleGalleryItemActive(itemId, active) {
+  try {
+    await adminFetch(`/admin/gallery/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active })
+    });
+    loadGalleryItems();
+  } catch (error) {
+    console.error('Error toggling item:', error);
+    alert('Error updating item');
+  }
+}
+
+async function deleteGalleryItem(itemId) {
+  if (!confirm('Are you sure you want to delete this gallery item?')) return;
+
+  try {
+    await adminFetch(`/admin/gallery/${itemId}`, {
+      method: 'DELETE'
+    });
+    alert('Gallery item deleted successfully!');
+    loadGalleryItems();
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    alert('Error deleting item');
+  }
+}
+
 // ============ PRICING MANAGEMENT ============
 
 async function loadPricingPage() {
@@ -485,6 +839,22 @@ document.addEventListener('click', (e) => {
 
   if (e.target.classList.contains('modal')) {
     e.target.classList.remove('show');
+  }
+
+  // Close edit modal when clicking outside
+  const editModal = document.getElementById('edit-image-modal');
+  if (editModal && e.target === editModal) {
+    closeEditModal();
+  }
+});
+
+// Close edit modal on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const editModal = document.getElementById('edit-image-modal');
+    if (editModal && editModal.classList.contains('show')) {
+      closeEditModal();
+    }
   }
 });
 

@@ -44,6 +44,7 @@
         <li><a href="#" data-tab="overview" class="tab-link active">Dashboard</a></li>
         <li><a href="#" data-tab="quotes" class="tab-link">Quotes</a></li>
         <li><a href="#" data-tab="products" class="tab-link">Products</a></li>
+        <li><a href="#" data-tab="gallery" class="tab-link">Gallery</a></li>
         <li><a href="#" data-tab="pricing" class="tab-link">Pricing</a></li>
         <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
         <li><a href="#" id="logoutBtn" class="logout-link">Logout</a></li>
@@ -202,6 +203,67 @@
         </div>
       </div>
 
+      <!-- Gallery Management Tab -->
+      <div id="galleryTab" class="admin-tab">
+        <h1>Gallery Management</h1>
+
+        <button id="addGalleryImageBtn" class="btn btn-primary">+ Add New Image</button>
+
+        <!-- Upload Section -->
+        <div id="gallery-upload-section" class="gallery-upload-section">
+          <div class="gallery-upload-box">
+            <input type="file" id="gallery-image-input" accept="image/*" style="display: none;" />
+            <div id="gallery-upload-area" class="file-upload-area">
+              <p>📁 Drag images here or <a href="#" onclick="document.getElementById('gallery-image-input').click(); return false;">choose files</a></p>
+              <small>Supported: JPG, PNG, GIF</small>
+            </div>
+            <div id="gallery-file-preview-area" style="margin-top: 15px;"></div>
+            <form id="gallery-upload-form" style="display: none;">
+              <div class="form-group">
+                <label for="gallery-upload-title">Image Title *</label>
+                <input type="text" id="gallery-upload-title" placeholder="e.g., T-Shirt Branding Project" required>
+              </div>
+
+              <div class="form-group">
+                <label for="gallery-upload-category">Category</label>
+                <select id="gallery-upload-category">
+                  <option value="General">General</option>
+                  <option value="Clothing">Clothing</option>
+                  <option value="Printing">Printing</option>
+                  <option value="Signage">Signage</option>
+                  <option value="Vehicle Branding">Vehicle Branding</option>
+                  <option value="Promotional Items">Promotional Items</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="gallery-upload-description">Description</label>
+                <textarea id="gallery-upload-description" placeholder="Describe this project..." rows="3"></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Upload Image</button>
+                <button type="button" class="btn btn-secondary" onclick="cancelGalleryUpload()">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Gallery Items List -->
+        <div id="gallery-items-container" style="display: none;">
+          <div id="gallery-loading" style="text-align: center; padding: 30px;">
+            <p>Loading gallery items...</p>
+          </div>
+          <div id="gallery-empty" style="display: none; text-align: center; padding: 30px;">
+            <p>No gallery items yet. Add your first image above.</p>
+          </div>
+          <div id="gallery-items-list" class="gallery-items-list">
+            <!-- Populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+
       <!-- Pricing Management Tab -->
       <div id="pricingTab" class="admin-tab">
         <h1>Pricing Management</h1>
@@ -260,6 +322,70 @@
       <h2>Quote Details</h2>
       <div id="quoteDetailContent">
         <!-- Populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Gallery Image Modal -->
+  <div id="edit-image-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Edit Gallery Image</h2>
+        <button class="modal-close" onclick="closeEditModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Current Image Preview -->
+        <div class="edit-image-section">
+          <h3 style="font-size: 0.95em; color: #666; margin-top: 0;">Current Image</h3>
+          <div class="edit-image-preview">
+            <img id="edit-image-preview" src="" alt="Preview" />
+          </div>
+        </div>
+
+        <!-- Upload New Image Section -->
+        <div class="edit-image-section">
+          <h3 style="font-size: 0.95em; color: #666;">Replace Image (Optional)</h3>
+          <div class="file-upload-area" id="edit-file-upload-area">
+            <input type="file" id="edit-gallery-image-input" accept="image/*" style="display: none;" />
+            <p>📁 Drag new image here or <a href="#" onclick="document.getElementById('edit-gallery-image-input').click(); return false;">choose file</a></p>
+            <small>Leave empty to keep current image</small>
+            <div id="edit-file-preview-area" style="margin-top: 10px;"></div>
+          </div>
+        </div>
+
+        <!-- Edit Details Form -->
+        <form id="edit-image-form">
+          <input type="hidden" id="edit-image-id" />
+
+          <div class="form-group">
+            <label for="edit-image-title">Title *</label>
+            <input type="text" id="edit-image-title" placeholder="e.g., T-Shirt Branding Project" required />
+          </div>
+
+          <div class="form-group">
+            <label for="edit-image-category">Category</label>
+            <select id="edit-image-category">
+              <option value="General">General</option>
+              <option value="Clothing">Clothing</option>
+              <option value="Printing">Printing</option>
+              <option value="Signage">Signage</option>
+              <option value="Vehicle Branding">Vehicle Branding</option>
+              <option value="Promotional Items">Promotional Items</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-image-description">Description</label>
+            <textarea id="edit-image-description" placeholder="Describe this project..." rows="4"></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditedImage()">Save Changes</button>
       </div>
     </div>
   </div>
