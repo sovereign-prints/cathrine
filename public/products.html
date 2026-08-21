@@ -126,6 +126,161 @@
       background: #4338ca;
     }
 
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      position: relative;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      overflow-y: auto;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal .close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 28px;
+      cursor: pointer;
+      color: #1f2937;
+      background: none;
+      border: none;
+      padding: 5px 10px;
+    }
+
+    .modal .close:hover {
+      color: #4f46e5;
+    }
+
+    .product-details h2 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: #1f2937;
+    }
+
+    .product-details p {
+      margin: 0 0 20px 0;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .product-image {
+      margin-bottom: 20px;
+    }
+
+    .product-image img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    .pricing-table {
+      margin-bottom: 20px;
+    }
+
+    .pricing-table h3 {
+      font-size: 16px;
+      color: #1f2937;
+      margin: 0 0 10px 0;
+    }
+
+    .pricing-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .pricing-table th,
+    .pricing-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .pricing-table th {
+      background: #f3f4f6;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .product-specs {
+      margin-bottom: 20px;
+    }
+
+    .product-specs h3 {
+      font-size: 16px;
+      color: #1f2937;
+      margin: 0 0 10px 0;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.3s ease;
+    }
+
+    .btn-primary {
+      flex: 1;
+      background: #4f46e5;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      background: #e5e7eb;
+      color: #1f2937;
+    }
+
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+
     @media (max-width: 768px) {
       .products-grid {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -140,6 +295,11 @@
         padding: 8px 16px;
         font-size: 14px;
       }
+
+      .modal-content {
+        max-width: 95%;
+        padding: 20px;
+      }
     }
   </style>
 </head>
@@ -148,16 +308,7 @@
   <nav class="navbar">
     <div class="container">
       <div class="navbar-brand">
-        <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs>
-            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#818cf8"/>
-              <stop offset="100%" stop-color="#ec4899"/>
-            </linearGradient>
-          </defs>
-          <path d="M50 4 L92 24 V54 C92 78 73 93 50 99 C27 93 8 78 8 54 V24 Z" fill="url(#logoGrad)"/>
-          <text x="50" y="63" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff" text-anchor="middle">SP</text>
-        </svg>
+        <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark" style="height: 50px; width: auto;">
         <div>
           <h1>Sovereign Prints</h1>
           <p class="tagline">You bring it. We brand it.</p>

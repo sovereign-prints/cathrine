@@ -5,8 +5,8 @@
 let currentFilter = 'all';
 let allGalleryItems = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadGalleryItems();
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadGalleryItems();
   setupCategoryTabs();
   displayGalleryItems();
   setupLightbox();
