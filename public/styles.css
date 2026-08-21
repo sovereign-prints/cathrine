@@ -43,7 +43,7 @@ body {
 /* ============ NAVBAR ============ */
 
 .navbar {
-  background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
+  background: #000000;
   color: var(--white);
   padding: 12px 0;
   box-shadow: 0 2px 10px rgba(0,0,0,0.3);
