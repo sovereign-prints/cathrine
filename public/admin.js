@@ -10,36 +10,113 @@ let editingGalleryId = null;
 // ============ INITIALIZATION ============
 
 document.addEventListener('DOMContentLoaded', () => {
-  setupLogout();
-  setupTabNavigation();
-  loadDashboardStats();
-  loadAdminQuotes();
-  loadTemplates();
+  // First, check if user is already logged in
+  authToken = localStorage.getItem('adminToken');
+
+  if (authToken) {
+    // User is authenticated, show dashboard
+    showDashboard();
+    setupLogout();
+    setupTabNavigation();
+    loadDashboardStats();
+    loadAdminQuotes();
+    loadTemplates();
+  } else {
+    // User is not authenticated, show login screen
+    showLoginScreen();
+    setupLoginForm();
+  }
 });
+
+// ============ LOGIN SCREEN ============
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('adminDashboard').style.display = 'none';
+}
+
+function showDashboard() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = 'flex';
+}
+
+function setupLoginForm() {
+  const loginForm = document.getElementById('loginForm');
+  const errorDiv = document.getElementById('loginError');
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const password = document.getElementById('password').value;
+    errorDiv.textContent = ''; // Clear previous errors
+
+    try {
+      // Send password to backend for validation
+      const response = await fetch(`${API_BASE}/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.token) {
+        // Save token and show dashboard
+        authToken = data.token;
+        localStorage.setItem('adminToken', authToken);
+
+        // Reset form
+        loginForm.reset();
+
+        // Show dashboard
+        showDashboard();
+        setupLogout();
+        setupTabNavigation();
+        loadDashboardStats();
+        loadAdminQuotes();
+        loadTemplates();
+      } else {
+        // Show error message
+        errorDiv.textContent = data.error || 'Invalid password. Please try again.';
+        errorDiv.style.display = 'block';
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      errorDiv.textContent = 'Connection error. Please try again.';
+      errorDiv.style.display = 'block';
+    }
+  });
+}
 
 // ============ LOGOUT ============
 
 function setupLogout() {
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('adminToken');
-    window.location.href = '/';
+    authToken = null;
+    showLoginScreen();
+    setupLoginForm();
+    document.getElementById('loginForm').reset();
   });
 }
 
 // ============ TAB NAVIGATION ============
 
 function setupTabNavigation() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
+  document.querySelectorAll('.tab-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tabName = link.dataset.tab;
 
-      // Remove active class from all buttons and content
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      // Remove active class from all links and tabs
+      document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
 
       // Add active class to clicked tab
-      btn.classList.add('active');
-      document.getElementById(tabName).classList.add('active');
+      link.classList.add('active');
+      document.getElementById(tabName + 'Tab').classList.add('active');
 
       // Load data for tab
       if (tabName === 'quotes') {
@@ -89,10 +166,25 @@ async function loadAdminQuotes() {
 // ============ TEMPLATE MANAGEMENT ============
 
 function loadTemplates(filterType = null) {
+  if (!authToken) {
+    console.warn('Not authenticated');
+    return;
+  }
+
   fetch(`${API_BASE}/admin/templates`, {
     headers: { 'Authorization': `Bearer ${authToken}` }
   })
-  .then(r => r.json())
+  .then(r => {
+    if (r.status === 401) {
+      // Token expired, redirect to login
+      localStorage.removeItem('adminToken');
+      authToken = null;
+      showLoginScreen();
+      setupLoginForm();
+      throw new Error('Authentication expired');
+    }
+    return r.json();
+  })
   .then(templates => {
     if (filterType) {
       templates = templates.filter(t => t.type === filterType);
@@ -133,6 +225,11 @@ function displayTemplates(templates) {
 }
 
 function editTemplate(id) {
+  if (!authToken) {
+    alert('Not authenticated');
+    return;
+  }
+
   fetch(`${API_BASE}/admin/templates/${id}`, {
     headers: { 'Authorization': `Bearer ${authToken}` }
   })
@@ -194,6 +291,11 @@ function openTemplateEditor(template) {
 }
 
 function saveTemplate(event, templateId) {
+  if (!authToken) {
+    alert('Not authenticated');
+    return;
+  }
+
   event.preventDefault();
   const form = event.target;
   const data = {
@@ -234,6 +336,11 @@ function saveTemplate(event, templateId) {
 }
 
 function previewTemplate(id) {
+  if (!authToken) {
+    alert('Not authenticated');
+    return;
+  }
+
   fetch(`${API_BASE}/admin/templates/${id}`, {
     headers: { 'Authorization': `Bearer ${authToken}` }
   })
@@ -273,6 +380,11 @@ document.addEventListener('click', (e) => {
 // ============ BUSINESS SETTINGS ============
 
 function saveBusinessSettings(event) {
+  if (!authToken) {
+    alert('Not authenticated');
+    return;
+  }
+
   event.preventDefault();
 
   const settings = {
