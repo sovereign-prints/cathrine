@@ -181,6 +181,51 @@ function initializeDefaultTemplates() {
 // Initialize data
 initializeData();
 
+// Auto-load gallery images from gallery_images folder
+function autoLoadGalleryImages() {
+  try {
+    const galleryImagesDir = path.join(__dirname, 'gallery_images');
+    if (!fs.existsSync(galleryImagesDir)) {
+      console.log('gallery_images directory not found');
+      return;
+    }
+
+    const files = fs.readdirSync(galleryImagesDir);
+    const imageFiles = files.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
+
+    if (imageFiles.length === 0) {
+      console.log('No images found in gallery_images directory');
+      return;
+    }
+
+    // Read existing gallery
+    let gallery = readGallery();
+
+    // If gallery is empty or doesn't have all images, rebuild it
+    if (gallery.length < imageFiles.length) {
+      gallery = imageFiles.map((file, index) => ({
+        id: index + 1,
+        title: file.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '').replace(/-/g, ' ').toUpperCase(),
+        category: 'Gallery',
+        description: 'Sovereign Prints portfolio piece',
+        image: `/gallery_images/${file}`,
+        imageUrl: `/gallery_images/${file}`,
+        active: true,
+        order: index,
+        createdAt: new Date().toISOString()
+      }));
+
+      saveGallery(gallery);
+      console.log(`Gallery auto-loaded with ${imageFiles.length} images`);
+    }
+  } catch (err) {
+    console.error('Error auto-loading gallery images:', err);
+  }
+}
+
+// Auto-load gallery images on startup
+autoLoadGalleryImages();
+
 // ==================== API ROUTES ====================
 
 // Get all active products
@@ -830,6 +875,9 @@ app.get('/api/gallery', (req, res) => {
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
+
+// Serve gallery images
+app.use('/gallery_images', express.static('gallery_images'));
 
 // Start server
 app.listen(PORT, () => {
