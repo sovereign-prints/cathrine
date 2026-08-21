@@ -8,7 +8,7 @@
   <style>
     .gallery-section {
       padding: 60px 0;
-      background: #f8f9fa;
+      background: #16213e;
     }
 
     .category-tabs {
@@ -24,23 +24,26 @@
     .category-tab {
       padding: 10px 20px;
       border: none;
-      background: transparent;
-      color: #6b7280;
+      background: rgba(129, 140, 248, 0.1);
+      color: #ffffff;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 500;
-      border-bottom: 3px solid transparent;
       transition: all 0.3s ease;
       white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 6px;
     }
 
     .category-tab:hover {
-      color: #4f46e5;
+      background: rgba(129, 140, 248, 0.2);
+      color: #818cf8;
     }
 
     .category-tab.active {
-      color: #4f46e5;
-      border-bottom-color: #4f46e5;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
     }
 
     .gallery-grid {

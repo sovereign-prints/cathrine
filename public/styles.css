@@ -78,6 +78,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-decoration: none;
 }
 
 .navbar-brand .tagline {
