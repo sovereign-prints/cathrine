@@ -18,9 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     showDashboard();
     setupLogout();
     setupTabNavigation();
+    setupFormHandlers();
+    setupImageUploads();
     loadDashboardStats();
     loadAdminQuotes();
     loadTemplates();
+    loadProducts();
+    loadGalleryItems();
   } else {
     // User is not authenticated, show login screen
     showLoginScreen();
@@ -74,9 +78,13 @@ function setupLoginForm() {
         showDashboard();
         setupLogout();
         setupTabNavigation();
+        setupFormHandlers();
+        setupImageUploads();
         loadDashboardStats();
         loadAdminQuotes();
         loadTemplates();
+        loadProducts();
+        loadGalleryItems();
       } else {
         // Show error message
         errorDiv.textContent = data.error || 'Invalid password. Please try again.';
@@ -121,6 +129,12 @@ function setupTabNavigation() {
       // Load data for tab
       if (tabName === 'quotes') {
         loadAdminQuotes();
+      } else if (tabName === 'products') {
+        loadProducts();
+      } else if (tabName === 'gallery') {
+        loadGalleryItems();
+      } else if (tabName === 'pricing') {
+        loadProducts(); // Pricing tab also needs product data
       } else if (tabName === 'templates') {
         loadTemplates();
       }

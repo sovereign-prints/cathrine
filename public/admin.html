@@ -85,25 +85,133 @@
 
       <!-- Products Tab -->
       <div id="productsTab" class="admin-tab">
-        <h1>Products</h1>
-        <div id="productsContent">
-          <p>Products management coming soon...</p>
+        <div class="section">
+          <h2>📦 Current Products</h2>
+          <p style="color: #6b7280; margin-bottom: 20px;">Manage your product images and titles</p>
+          <div class="product-list" id="productsList">
+            <!-- Populated by JavaScript -->
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>➕ Add New Product</h2>
+          <div id="productUploadMessage"></div>
+
+          <form id="productImageForm">
+            <div class="form-group">
+              <label>Product Title</label>
+              <input type="text" id="productTitle" placeholder="e.g., Business Cards" required>
+            </div>
+
+            <div class="form-group">
+              <label>Product Description</label>
+              <textarea id="productDescription" placeholder="Brief description of this product"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Category</label>
+              <select id="productCategory" required>
+                <option value="">-- Select a category --</option>
+                <option value="Printing">Printing</option>
+                <option value="Clothing">Clothing</option>
+                <option value="Signage">Signage</option>
+                <option value="Vehicle Branding">Vehicle Branding</option>
+                <option value="Promotional Items">Promotional Items</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Product Image</label>
+              <div class="image-upload" id="productImageUpload">
+                <div>📸 Click to upload or drag and drop</div>
+                <div style="font-size: 12px; color: #9ca3af; margin-top: 5px;">PNG, JPG, GIF up to 5MB</div>
+                <input type="file" id="productImageInput" accept="image/*">
+              </div>
+              <img id="productImagePreview" class="image-preview" style="display:none;">
+            </div>
+
+            <div class="btn-group">
+              <button type="submit" class="btn btn-primary">Add Product</button>
+              <button type="button" class="btn btn-secondary" onclick="resetProductForm()">Clear</button>
+            </div>
+          </form>
         </div>
       </div>
 
       <!-- Gallery Tab -->
       <div id="galleryTab" class="admin-tab">
-        <h1>Gallery</h1>
-        <div id="galleryContent">
-          <p>Gallery management coming soon...</p>
+        <div class="section">
+          <h2>🖼️ Add Gallery Item</h2>
+          <div id="galleryUploadMessage"></div>
+
+          <form id="galleryForm">
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" id="galleryTitle" placeholder="e.g., Custom T-Shirt Branding" required>
+            </div>
+
+            <div class="form-group">
+              <label>Category</label>
+              <select id="galleryCategory" required>
+                <option value="">-- Select a category --</option>
+                <option value="Clothing">Clothing</option>
+                <option value="Printing">Printing</option>
+                <option value="Vehicle Branding">Vehicle Branding</option>
+                <option value="Signage">Signage</option>
+                <option value="Promotional Items">Promotional Items</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Description</label>
+              <textarea id="galleryDescription" placeholder="Brief description of this gallery item"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Image</label>
+              <div class="image-upload" id="galleryImageUpload">
+                <div>📸 Click to upload or drag and drop</div>
+                <div style="font-size: 12px; color: #9ca3af; margin-top: 5px;">PNG, JPG, GIF up to 5MB</div>
+                <input type="file" id="galleryImageInput" accept="image/*" required>
+              </div>
+              <img id="galleryImagePreview" class="image-preview" style="display:none;">
+            </div>
+
+            <div class="btn-group">
+              <button type="submit" class="btn btn-primary">Add to Gallery</button>
+              <button type="button" class="btn btn-secondary" onclick="resetGalleryForm()">Clear</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="section">
+          <h2>📸 Gallery Items</h2>
+          <div class="gallery-list" id="galleryList">
+            <!-- Populated by JavaScript -->
+          </div>
         </div>
       </div>
 
       <!-- Pricing Tab -->
       <div id="pricingTab" class="admin-tab">
-        <h1>Pricing</h1>
-        <div id="pricingContent">
-          <p>Pricing management coming soon...</p>
+        <div class="section">
+          <h2>💰 Product Pricing</h2>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Base Price</th>
+                <th>Pricing Model</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pricingTableBody">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
         </div>
       </div>
 
