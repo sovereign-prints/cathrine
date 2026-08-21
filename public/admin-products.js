@@ -66,34 +66,29 @@ async function loadGalleryItems() {
 // ============ DISPLAY PRODUCTS ============
 
 function displayProducts() {
-  // Populate product select dropdown
-  const productSelect = document.getElementById('productSelect');
-  if (productSelect) {
-    const options = allProducts.map(p =>
-      `<option value="${p.id}">${p.name} (${p.category})</option>`
-    ).join('');
-    productSelect.innerHTML = '<option value="">-- Choose a product --</option>' + options;
-  }
-
-  // Display products in table
-  const tbody = document.getElementById('productsTableBody');
-  if (tbody) {
-    tbody.innerHTML = allProducts.map(product => `
-      <tr>
-        <td><strong>${product.name}</strong></td>
-        <td>${product.category}</td>
-        <td>R${formatPrice(product.basePrice)}</td>
-        <td>
-          <div style="width: 40px; height: 40px; background: #e5e7eb; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #9ca3af;">
-            IMG
+  // Display products as thumbnails
+  const productsList = document.getElementById('productsList');
+  if (productsList) {
+    if (allProducts.length === 0) {
+      productsList.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 40px;">No products yet. Add your first product below.</p>';
+    } else {
+      productsList.innerHTML = allProducts.map(product => `
+        <div class="product-card">
+          <div class="product-image">
+            ${product.image ? `<img src="${product.image}" alt="${product.name}">` : '<div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; color:#9ca3af;">No Image</div>'}
           </div>
-        </td>
-        <td>
-          <button class="btn btn-secondary" onclick="editProduct(${product.id})">Edit</button>
-          <button class="btn btn-secondary" onclick="deleteProduct(${product.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+          <div class="product-details">
+            <h3>${product.name}</h3>
+            <p>${product.category}</p>
+            <div class="product-actions">
+              <button class="btn btn-secondary" onclick="editProductImage(${product.id})">Change Image</button>
+              <button class="btn btn-secondary" onclick="editProductTitle(${product.id})">Edit Title</button>
+              <button class="btn btn-danger" onclick="deleteProduct(${product.id})">Delete</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
   }
 
   // Display pricing info
@@ -188,6 +183,41 @@ function setupFormHandlers() {
 
 // ============ IMAGE UPLOAD HANDLING ============
 
+function setupImageUpload(uploadId, inputId, previewId) {
+  const upload = document.getElementById(uploadId);
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+
+  if (upload && input) {
+    upload.addEventListener('click', () => input.click());
+    upload.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      upload.style.background = 'rgba(79, 70, 229, 0.05)';
+    });
+    upload.addEventListener('dragleave', () => {
+      upload.style.background = '#f9fafb';
+    });
+    upload.addEventListener('drop', (e) => {
+      e.preventDefault();
+      upload.style.background = '#f9fafb';
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        if (preview) {
+          preview.src = URL.createObjectURL(e.dataTransfer.files[0]);
+          preview.style.display = 'block';
+        }
+      }
+    });
+
+    input.addEventListener('change', () => {
+      if (input.files[0] && preview) {
+        preview.src = URL.createObjectURL(input.files[0]);
+        preview.style.display = 'block';
+      }
+    });
+  }
+}
+
 function setupImageUploads() {
   // Product image upload
   const productUpload = document.getElementById('productImageUpload');
@@ -273,12 +303,14 @@ function previewGalleryImage() {
 // ============ UPLOAD FUNCTIONS ============
 
 async function uploadProductImage() {
-  const productId = document.getElementById('productSelect').value;
+  const title = document.getElementById('productTitle').value;
+  const description = document.getElementById('productDescription').value;
+  const category = document.getElementById('productCategory').value;
   const imageInput = document.getElementById('productImageInput');
   const messageDiv = document.getElementById('productUploadMessage');
 
-  if (!productId) {
-    showMessage(messageDiv, 'Please select a product', 'error');
+  if (!title || !category) {
+    showMessage(messageDiv, 'Please fill in product title and category', 'error');
     return;
   }
 
@@ -288,23 +320,25 @@ async function uploadProductImage() {
   }
 
   const formData = new FormData();
-  formData.append('productId', productId);
+  formData.append('name', title);
+  formData.append('description', description);
+  formData.append('category', category);
   formData.append('image', imageInput.files[0]);
 
   try {
-    const response = await fetch('/api/admin/product-image', {
+    const response = await fetch('/api/admin/products', {
       method: 'POST',
       body: formData
     });
 
     if (!response.ok) throw new Error('Upload failed');
 
-    showMessage(messageDiv, 'Product image uploaded successfully!', 'success');
+    showMessage(messageDiv, 'Product added successfully!', 'success');
     resetProductForm();
     loadProducts();
   } catch (error) {
-    console.error('Error uploading product image:', error);
-    showMessage(messageDiv, 'Failed to upload image. Please try again.', 'error');
+    console.error('Error adding product:', error);
+    showMessage(messageDiv, 'Failed to add product. Please try again.', 'error');
   }
 }
 
@@ -422,6 +456,142 @@ async function saveGalleryChanges() {
   } catch (error) {
     console.error('Error updating gallery item:', error);
     alert('Failed to update gallery item');
+  }
+}
+
+// ============ EDIT PRODUCT IMAGE & TITLE ============
+
+function editProductImage(productId) {
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
+
+  editingProductId = productId;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <span class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+      <h2>Change Image for ${product.name}</h2>
+      <form onsubmit="saveProductImage(event, ${productId})">
+        <div class="form-group">
+          <label>New Image</label>
+          <div class="image-upload" id="editImageUpload">
+            <div>📸 Click to upload or drag and drop</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 5px;">PNG, JPG, GIF up to 5MB</div>
+            <input type="file" id="editImageInput" accept="image/*" required>
+          </div>
+          <img id="editImagePreview" class="image-preview" style="display:none;">
+        </div>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">Save Image</button>
+          <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  setupImageUpload('editImageUpload', 'editImageInput', 'editImagePreview');
+}
+
+function editProductTitle(productId) {
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
+
+  editingProductId = productId;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <span class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+      <h2>Edit Product Details</h2>
+      <form onsubmit="saveProductTitle(event, ${productId})">
+        <div class="form-group">
+          <label>Product Title</label>
+          <input type="text" id="editTitle" value="${product.name}" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="editDescription">${product.description || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="editCategory" required>
+            <option value="Printing" ${product.category === 'Printing' ? 'selected' : ''}>Printing</option>
+            <option value="Clothing" ${product.category === 'Clothing' ? 'selected' : ''}>Clothing</option>
+            <option value="Signage" ${product.category === 'Signage' ? 'selected' : ''}>Signage</option>
+            <option value="Vehicle Branding" ${product.category === 'Vehicle Branding' ? 'selected' : ''}>Vehicle Branding</option>
+            <option value="Promotional Items" ${product.category === 'Promotional Items' ? 'selected' : ''}>Promotional Items</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function saveProductImage(event, productId) {
+  event.preventDefault();
+
+  const fileInput = document.getElementById('editImageInput');
+  if (!fileInput.files[0]) {
+    alert('Please select an image');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('image', fileInput.files[0]);
+
+  try {
+    const response = await fetch(`/api/admin/products/${productId}/image`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) throw new Error('Update failed');
+
+    alert('Image updated successfully!');
+    loadProducts();
+    document.querySelector('.modal').remove();
+  } catch (error) {
+    console.error('Error updating image:', error);
+    alert('Failed to update image');
+  }
+}
+
+async function saveProductTitle(event, productId) {
+  event.preventDefault();
+
+  const name = document.getElementById('editTitle').value;
+  const description = document.getElementById('editDescription').value;
+  const category = document.getElementById('editCategory').value;
+
+  if (!name) {
+    alert('Please enter a product title');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/admin/products/${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, category })
+    });
+
+    if (!response.ok) throw new Error('Update failed');
+
+    alert('Product updated successfully!');
+    loadProducts();
+    document.querySelector('.modal').remove();
+  } catch (error) {
+    console.error('Error updating product:', error);
+    alert('Failed to update product');
   }
 }
 

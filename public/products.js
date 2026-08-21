@@ -159,7 +159,6 @@ function showProductModal(productId) {
   const modalPlaceholderImage = document.getElementById('modalPlaceholderImage');
   const pricingTable = document.getElementById('pricingTable');
   const modalProductSpecs = document.getElementById('modalProductSpecs');
-  const modalProductTurnaround = document.getElementById('modalProductTurnaround');
 
   // Set product info
   modalProductName.textContent = product.name;
@@ -194,7 +193,6 @@ function showProductModal(productId) {
 
   // Set specs
   modalProductSpecs.textContent = product.specs || 'Standard printing specifications';
-  modalProductTurnaround.textContent = product.turnaround || '5';
 
   // Show modal
   modal.classList.add('show');

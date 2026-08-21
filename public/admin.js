@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupLogout() {
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('adminToken');
-    location.reload();
+    window.location.href = '/';
   });
 }
 
@@ -269,3 +269,38 @@ document.addEventListener('click', (e) => {
     closeEditModal('editGalleryModal');
   }
 });
+
+// ============ BUSINESS SETTINGS ============
+
+function saveBusinessSettings(event) {
+  event.preventDefault();
+
+  const settings = {
+    businessName: document.getElementById('businessName').value,
+    businessEmail: document.getElementById('businessEmail').value,
+    businessPhone: document.getElementById('businessPhone').value,
+    businessLocation: document.getElementById('businessLocation').value,
+    businessTagline: document.getElementById('businessTagline').value
+  };
+
+  fetch(`${API_BASE}/admin/settings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
+    body: JSON.stringify(settings)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.error) {
+      alert('Error: ' + result.error);
+    } else {
+      alert('Settings saved successfully!');
+    }
+  })
+  .catch(err => {
+    console.error('Error saving settings:', err);
+    alert('Error saving settings. Changes saved locally.');
+  });
+}
