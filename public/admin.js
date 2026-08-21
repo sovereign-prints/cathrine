@@ -876,3 +876,220 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     loadAdminQuotes();
   });
 });
+// ============ TEMPLATE MANAGEMENT ============
+
+function loadTemplates(filterType = null) {
+  fetch(`${API_BASE}/admin/templates`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(templates => {
+    if (filterType) {
+      templates = templates.filter(t => t.type === filterType);
+    }
+    displayTemplates(templates);
+  })
+  .catch(err => console.error('Error loading templates:', err));
+}
+
+function displayTemplates(templates) {
+  const list = document.getElementById('templatesList');
+  if (!templates || templates.length === 0) {
+    list.innerHTML = '<p>No templates found.</p>';
+    return;
+  }
+
+  list.innerHTML = templates.map(t => `
+    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+      <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">
+        <div>
+          <h3 style="margin: 0 0 5px 0;">${t.name}</h3>
+          <p style="margin: 0; color: #666; font-size: 14px;">${t.description || 'No description'}</p>
+          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Type: ${t.type}${t.isDefault ? ' • <strong style="color: #0066cc;">Default</strong>' : ''}</p>
+        </div>
+        <div style="display: flex; gap: 5px;">
+          <button onclick="editTemplate('${t.id}')" class="btn btn-small">Edit</button>
+          <button onclick="previewTemplate('${t.id}')" class="btn btn-small">Preview</button>
+          ${!t.isDefault ? `<button onclick="deleteTemplate('${t.id}')" class="btn btn-small" style="background: #dc3545;">Delete</button>` : ''}
+          ${!t.isDefault ? `<button onclick="setDefaultTemplate('${t.id}')" class="btn btn-small" style="background: #28a745;">Set Default</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editTemplate(id) {
+  fetch(`${API_BASE}/admin/templates/${id}`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(template => openTemplateEditor(template))
+  .catch(err => console.error('Error loading template:', err));
+}
+
+function newTemplate() {
+  openTemplateEditor(null);
+}
+
+function openTemplateEditor(template) {
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>${template ? 'Edit Template' : 'New Template'}</h2>
+      <form onsubmit="saveTemplate(event, '${template?.id || ''}')">
+        <div class="form-group">
+          <label>Template Name</label>
+          <input type="text" name="name" value="${template?.name || ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type" ${template ? 'disabled' : ''} required>
+            <option value="quote" ${template?.type === 'quote' ? 'selected' : ''}>Quote</option>
+            <option value="invoice" ${template?.type === 'invoice' ? 'selected' : ''}>Invoice</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" name="description" value="${template?.description || ''}">
+        </div>
+        <div class="form-group">
+          <label>HTML Content (use {{PLACEHOLDER}} for variables)</label>
+          <textarea name="content" style="font-family: monospace; min-height: 400px; width: 100%;" required>${template?.content || ''}</textarea>
+          ${template?.placeholders ? `<p style="font-size: 12px; color: #666; margin-top: 5px;">Detected placeholders: ${template.placeholders.join(', ')}</p>` : ''}
+        </div>
+        <button type="submit" class="btn btn-primary">Save Template</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('.close').addEventListener('click', () => {
+    modal.remove();
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+}
+
+function saveTemplate(event, templateId) {
+  event.preventDefault();
+  const form = event.target;
+  const data = {
+    name: form.name.value,
+    type: form.type.value,
+    description: form.description.value,
+    content: form.content.value
+  };
+
+  const url = templateId 
+    ? `${API_BASE}/admin/templates/${templateId}`
+    : `${API_BASE}/admin/templates`;
+
+  const options = {
+    method: templateId ? 'PATCH' : 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
+    body: JSON.stringify(data)
+  };
+
+  fetch(url, options)
+    .then(r => r.json())
+    .then(result => {
+      if (result.error) {
+        alert('Error: ' + result.error);
+      } else {
+        loadTemplates();
+        document.querySelector('.modal').remove();
+      }
+    })
+    .catch(err => {
+      console.error('Error saving template:', err);
+      alert('Error saving template');
+    });
+}
+
+function deleteTemplate(id) {
+  if (confirm('Are you sure you want to delete this template?')) {
+    fetch(`${API_BASE}/admin/templates/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(r => r.json())
+    .then(result => {
+      if (result.error) {
+        alert('Error: ' + result.error);
+      } else {
+        loadTemplates();
+      }
+    })
+    .catch(err => console.error('Error deleting template:', err));
+  }
+}
+
+function previewTemplate(id) {
+  fetch(`${API_BASE}/admin/templates/${id}`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(template => {
+    // Sample data for preview
+    const sampleData = {
+      'COMPANY_NAME': 'Sovereign Prints',
+      'CUSTOMER_NAME': 'Sample Customer',
+      'DATE': new Date().toISOString().split('T')[0],
+      'QUOTE_NUMBER': 'QT-001',
+      'INVOICE_NUMBER': 'INV-001',
+      'QUOTE_DETAILS': 'Custom printing services',
+      'ITEMS_LIST': '• Item 1: R100\n• Item 2: R200',
+      'SUBTOTAL': 'R300',
+      'TAX': 'R45',
+      'TOTAL': 'R345',
+      'TOTAL_DUE': 'R345',
+      'EXPIRY_DATE': new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+      'DUE_DATE': new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+      'CONTACT_EMAIL': 'info@sovereignprints.co.za',
+      'CONTACT_PHONE': '+27 (0)11 xxx xxxx',
+      'PAYMENT_INSTRUCTIONS': 'Please transfer to bank account'
+    };
+
+    const preview = window.open('', 'Template Preview', 'width=900,height=600');
+    preview.document.write(template.content);
+    preview.document.close();
+  })
+  .catch(err => console.error('Error previewing template:', err));
+}
+
+function setDefaultTemplate(id) {
+  fetch(`${API_BASE}/admin/templates/${id}/set-default`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.error) {
+      alert('Error: ' + result.error);
+    } else {
+      loadTemplates();
+    }
+  })
+  .catch(err => console.error('Error setting default:', err));
+}
+
+// Initialize template management when templates tab is clicked
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const tab = e.target.dataset.tab;
+      if (tab === 'templates') {
+        loadTemplates();
+      }
+    });
+  });
+});

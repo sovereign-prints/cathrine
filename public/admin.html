@@ -28,15 +28,18 @@
   <div id="adminDashboard" class="admin-dashboard" style="display: none;">
     <!-- Sidebar Navigation -->
     <aside class="admin-sidebar">
-      <div class="sidebar-brand">
-        <h2>Admin</h2>
-      </div>
+      <a href="/" class="sidebar-brand-link" title="Back to home">
+        <div class="sidebar-brand">
+          <h2>Admin</h2>
+        </div>
+      </a>
       <ul class="sidebar-menu">
         <li><a href="#" data-tab="overview" class="tab-link active">Dashboard</a></li>
         <li><a href="#" data-tab="quotes" class="tab-link">Quotes</a></li>
         <li><a href="#" data-tab="products" class="tab-link">Products</a></li>
         <li><a href="#" data-tab="gallery" class="tab-link">Gallery</a></li>
         <li><a href="#" data-tab="pricing" class="tab-link">Pricing</a></li>
+        <li><a href="#" data-tab="templates" class="tab-link">📄 Templates</a></li>
         <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
         <li><a href="#" id="logoutBtn" class="logout-link">Logout</a></li>
       </ul>
@@ -101,6 +104,19 @@
         <h1>Pricing</h1>
         <div id="pricingContent">
           <p>Pricing management coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Templates Tab -->
+      <div id="templatesTab" class="admin-tab">
+        <h1>Template Management</h1>
+
+        <div style="margin-bottom: 20px;">
+          <button onclick="newTemplate()" class="btn btn-primary">➕ New Template</button>
+        </div>
+
+        <div id="templatesList" style="display: grid; gap: 15px;">
+          <p>Loading templates...</p>
         </div>
       </div>
 

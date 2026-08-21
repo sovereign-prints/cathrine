@@ -41,6 +41,7 @@ const dataDir = 'data';
 const productsFile = path.join(dataDir, 'products.json');
 const quotesFile = path.join(dataDir, 'quotes.json');
 const galleryFile = path.join(dataDir, 'gallery.json');
+const templatesFile = path.join(dataDir, 'templates.json');
 
 // Initialize data files
 function initializeData() {
@@ -85,6 +86,9 @@ function initializeData() {
     fs.writeFileSync(galleryFile, JSON.stringify([], null, 2));
     console.log('Gallery data initialized');
   }
+
+  // Initialize templates with defaults
+  initializeDefaultTemplates();
 }
 
 // Helper functions to read/write data
@@ -122,6 +126,56 @@ function saveGallery(gallery) {
 
 function saveProducts(products) {
   fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+}
+
+// Template management functions
+function loadTemplates() {
+  try {
+    return JSON.parse(fs.readFileSync(templatesFile, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveTemplates(templates) {
+  fs.writeFileSync(templatesFile, JSON.stringify(templates, null, 2));
+}
+
+function extractPlaceholders(content) {
+  const matches = content.match(/{{(\w+)}}/g) || [];
+  return [...new Set(matches.map(m => m.replace(/[{}]/g, '')))];
+}
+
+function initializeDefaultTemplates() {
+  if (!fs.existsSync(templatesFile)) {
+    const defaultTemplates = [
+      {
+        id: 'default-quote',
+        name: 'Default Quote Template',
+        type: 'quote',
+        description: 'Standard quote template for customer inquiries',
+        content: `<html><head><style>body { font-family: Arial, sans-serif; margin: 40px; } .header { text-align: center; margin-bottom: 30px; } .section { margin: 20px 0; } .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }</style></head><body><div class="header"><h1>{{COMPANY_NAME}}</h1><p>Quote for {{CUSTOMER_NAME}}</p></div><div class="section"><p>Date: {{DATE}}</p><p>Quote Number: {{QUOTE_NUMBER}}</p></div><div class="section"><h2>Details</h2><p>{{QUOTE_DETAILS}}</p></div><div class="section"><h2>Pricing</h2><p>Subtotal: {{SUBTOTAL}}</p><p>Tax: {{TAX}}</p><p><strong>Total: {{TOTAL}}</strong></p></div><div class="footer"><p>Valid until: {{EXPIRY_DATE}}</p><p>Contact: {{CONTACT_EMAIL}} | {{CONTACT_PHONE}}</p></div></body></html>`,
+        placeholders: ['COMPANY_NAME', 'CUSTOMER_NAME', 'DATE', 'QUOTE_NUMBER', 'QUOTE_DETAILS', 'SUBTOTAL', 'TAX', 'TOTAL', 'EXPIRY_DATE', 'CONTACT_EMAIL', 'CONTACT_PHONE'],
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'default-invoice',
+        name: 'Default Invoice Template',
+        type: 'invoice',
+        description: 'Standard invoice template for orders',
+        content: `<html><head><style>body { font-family: Arial, sans-serif; margin: 40px; } .header { text-align: center; margin-bottom: 30px; } .section { margin: 20px 0; } .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }</style></head><body><div class="header"><h1>{{COMPANY_NAME}}</h1><p>Invoice</p></div><div class="section"><p>Invoice Number: {{INVOICE_NUMBER}}</p><p>Date: {{INVOICE_DATE}}</p><p>Bill To: {{CUSTOMER_NAME}}</p></div><div class="section"><h2>Items</h2><p>{{ITEMS_LIST}}</p></div><div class="section"><h2>Payment</h2><p>Subtotal: {{SUBTOTAL}}</p><p>Tax: {{TAX}}</p><p><strong>Total Due: {{TOTAL_DUE}}</strong></p></div><div class="footer"><p>Due Date: {{DUE_DATE}}</p><p>Payment Instructions: {{PAYMENT_INSTRUCTIONS}}</p><p>Contact: {{CONTACT_EMAIL}} | {{CONTACT_PHONE}}</p></div></body></html>`,
+        placeholders: ['COMPANY_NAME', 'INVOICE_NUMBER', 'INVOICE_DATE', 'CUSTOMER_NAME', 'ITEMS_LIST', 'SUBTOTAL', 'TAX', 'TOTAL_DUE', 'DUE_DATE', 'PAYMENT_INSTRUCTIONS', 'CONTACT_EMAIL', 'CONTACT_PHONE'],
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    saveTemplates(defaultTemplates);
+    console.log('Default templates initialized');
+  }
 }
 
 // Initialize data
@@ -572,6 +626,182 @@ app.post('/api/admin/product-image', adminAuth, upload.single('image'), (req, re
       productId: product.id,
       imagePath: product.image
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ TEMPLATE MANAGEMENT ENDPOINTS ============
+
+// Get all templates
+app.get('/api/admin/templates', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    res.json(templates);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single template
+app.get('/api/admin/templates/:id', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get templates by type
+app.get('/api/admin/templates/type/:type', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    const filtered = templates.filter(t => t.type === req.params.type);
+    res.json(filtered);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create new template
+app.post('/api/admin/templates', adminAuth, (req, res) => {
+  try {
+    const { name, type, description, content } = req.body;
+
+    if (!name || !type || !content) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const templates = loadTemplates();
+    const newTemplate = {
+      id: `template-${Date.now()}`,
+      name,
+      type,
+      description: description || '',
+      content,
+      placeholders: extractPlaceholders(content),
+      isDefault: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    templates.push(newTemplate);
+    saveTemplates(templates);
+
+    res.status(201).json(newTemplate);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update template
+app.patch('/api/admin/templates/:id', adminAuth, (req, res) => {
+  try {
+    const { name, description, content } = req.body;
+    const templates = loadTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Don't allow editing default templates
+    if (template.isDefault && !req.body.allowEditDefault) {
+      return res.status(403).json({ error: 'Cannot edit default templates' });
+    }
+
+    if (name) template.name = name;
+    if (description !== undefined) template.description = description;
+    if (content) {
+      template.content = content;
+      template.placeholders = extractPlaceholders(content);
+    }
+    template.updatedAt = new Date().toISOString();
+
+    saveTemplates(templates);
+    res.json(template);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete template
+app.delete('/api/admin/templates/:id', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Don't allow deleting default templates
+    if (template.isDefault) {
+      return res.status(403).json({ error: 'Cannot delete default templates' });
+    }
+
+    const filtered = templates.filter(t => t.id !== req.params.id);
+    saveTemplates(filtered);
+
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Set template as default for its type
+app.patch('/api/admin/templates/:id/set-default', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Unset previous default for this type
+    templates.forEach(t => {
+      if (t.type === template.type && t.id !== template.id) {
+        t.isDefault = false;
+      }
+    });
+
+    template.isDefault = true;
+    template.updatedAt = new Date().toISOString();
+    saveTemplates(templates);
+
+    res.json(template);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate template with data
+app.post('/api/admin/templates/:id/generate', adminAuth, (req, res) => {
+  try {
+    const templates = loadTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    let output = template.content;
+    const data = req.body || {};
+
+    // Replace placeholders with data
+    template.placeholders.forEach(placeholder => {
+      const value = data[placeholder] || `[${placeholder}]`;
+      const regex = new RegExp(`{{${placeholder}}}`, 'g');
+      output = output.replace(regex, value);
+    });
+
+    res.json({ output });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
