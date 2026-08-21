@@ -259,7 +259,16 @@
   <nav class="navbar">
     <div class="container">
       <div class="navbar-brand">
-        <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark" style="height: 50px; width: auto;">
+        <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="height: 50px; width: auto;">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818cf8"/>
+              <stop offset="100%" stop-color="#ec4899"/>
+            </linearGradient>
+          </defs>
+          <path d="M50 4 L92 24 V54 C92 78 73 93 50 99 C27 93 8 78 8 54 V24 Z" fill="url(#logoGrad)"/>
+          <text x="50" y="63" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff" text-anchor="middle">SP</text>
+        </svg>
         <div>
           <h1>Sovereign Prints</h1>
           <p class="tagline">You bring it. We brand it.</p>
