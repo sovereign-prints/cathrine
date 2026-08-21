@@ -83,8 +83,7 @@ function displayGalleryItems() {
   galleryGrid.innerHTML = filteredItems.map(item => `
     <div class="gallery-item" data-gallery-id="${item.id}">
       <div class="gallery-image">
-        <img src="${item.image}" alt="${item.title}" style="display:none;" onerror="this.style.display='none';">
-        <div class="placeholder-image">📷 ${item.category}</div>
+        <img src="${item.image}" alt="${item.title}" style="width:100%; height:100%; object-fit:cover;">
       </div>
       <div class="gallery-info">
         <div class="gallery-category">${item.category}</div>
