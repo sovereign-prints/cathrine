@@ -17,6 +17,100 @@
       color: #1f2937;
     }
 
+    /* LOGIN STYLES */
+    .login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-box {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    .login-logo {
+      max-width: 80px;
+      margin-bottom: 20px;
+    }
+
+    .login-box h1 {
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #1f2937;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .error-message {
+      color: #ef4444;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+
+    .btn-large {
+      padding: 14px 28px;
+      font-size: 16px;
+    }
+
+    /* ADMIN DASHBOARD STYLES */
     .admin-container {
       display: flex;
       min-height: 100vh;
@@ -58,9 +152,9 @@
 
     .sidebar-nav a:hover,
     .sidebar-nav a.active {
-      background: rgba(79, 70, 229, 0.1);
-      color: #818cf8;
-      border-left-color: #818cf8;
+      background: rgba(102, 126, 234, 0.1);
+      color: #a5b4fc;
+      border-left-color: #a5b4fc;
     }
 
     .admin-main {
@@ -104,12 +198,12 @@
     }
 
     .tab-btn:hover {
-      color: #4f46e5;
+      color: #667eea;
     }
 
     .tab-btn.active {
-      color: #4f46e5;
-      border-bottom-color: #4f46e5;
+      color: #667eea;
+      border-bottom-color: #667eea;
     }
 
     .tab-content {
@@ -163,25 +257,6 @@
       background: #f9fafb;
     }
 
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      transition: all 0.3s ease;
-    }
-
-    .btn-primary {
-      background: #4f46e5;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #4338ca;
-    }
-
     .btn-secondary {
       background: #e5e7eb;
       color: #1f2937;
@@ -229,41 +304,6 @@
       color: #1f2937;
     }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    .form-group textarea {
-      resize: vertical;
-      min-height: 100px;
-    }
-
-    .form-group input:focus,
-    .form-group textarea:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: #4f46e5;
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-    }
-
     .btn-group {
       display: flex;
       gap: 10px;
@@ -281,7 +321,7 @@
       background: #f9fafb;
       padding: 20px;
       border-radius: 8px;
-      border-left: 4px solid #4f46e5;
+      border-left: 4px solid #667eea;
     }
 
     .stat-label {
@@ -341,9 +381,6 @@
       font-weight: 600;
       font-size: 14px;
       margin-bottom: 8px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .product-actions {
@@ -399,7 +436,7 @@
     }
 
     .image-upload:hover {
-      border-color: #4f46e5;
+      border-color: #667eea;
       background: #f3f4f6;
     }
 
@@ -437,13 +474,33 @@
   </style>
 </head>
 <body>
-  <div class="admin-container">
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-box">
+      <h1>Sovereign Prints Admin</h1>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="password">Admin Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter admin password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-large">Login</button>
+        <p id="loginError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADMIN DASHBOARD -->
+  <div id="adminDashboard" class="admin-container" style="display: none;">
     <!-- Sidebar Navigation -->
     <aside class="admin-sidebar">
       <h2>Admin Panel</h2>
       <ul class="sidebar-nav">
-        <li><a href="admin.html" class="active">Dashboard</a></li>
-        <li><a href="#" id="logoutBtn">Logout</a></li>
+        <li><a href="#" class="sidebar-link active" data-tab="overview">Dashboard</a></li>
+        <li><a href="#" class="sidebar-link" data-tab="quotes">Quotes</a></li>
+        <li><a href="#" class="sidebar-link" data-tab="products">Products & Gallery</a></li>
+        <li><a href="#" class="sidebar-link" data-tab="templates">Templates</a></li>
+        <li><a href="#" class="sidebar-link" data-tab="settings">Settings</a></li>
+        <li><a href="#" id="logoutBtn" class="sidebar-link">Logout</a></li>
       </ul>
     </aside>
 
@@ -490,13 +547,8 @@
         <div class="section">
           <h2>ℹ️ Quick Info</h2>
           <p style="margin-bottom: 15px; color: #666;">
-            Use the <strong>Products & Gallery</strong> section to manage all your:
+            Use the <strong>Products & Gallery</strong> section to manage all your products and showcase items.
           </p>
-          <ul style="margin-left: 20px; color: #666;">
-            <li style="margin-bottom: 8px;">📦 <strong>Products</strong> — Upload images, edit details, manage pricing</li>
-            <li style="margin-bottom: 8px;">🖼️ <strong>Gallery</strong> — Add showcase images with categories</li>
-            <li style="margin-bottom: 8px;">💰 <strong>Pricing</strong> — View and edit all product pricing</li>
-          </ul>
         </div>
       </div>
 

@@ -10,90 +10,51 @@ let editingGalleryId = null;
 // ============ INITIALIZATION ============
 
 document.addEventListener('DOMContentLoaded', () => {
-  // First, check if user is already logged in
-  authToken = localStorage.getItem('adminToken');
-
-  if (authToken) {
-    // User is authenticated, show dashboard
-    showDashboard();
-    setupLogout();
-    setupTabNavigation();
-    setupFormHandlers();
-    setupImageUploads();
-    loadDashboardStats();
-    loadAdminQuotes();
-    loadTemplates();
-    loadProducts();
-    loadGalleryItems();
-  } else {
-    // User is not authenticated, show login screen
-    showLoginScreen();
-    setupLoginForm();
-  }
+  checkAuth();
+  setupLogout();
+  setupTabNavigation();
+  loadDashboardStats();
+  loadAdminQuotes();
+  loadTemplates();
 });
 
-// ============ LOGIN SCREEN ============
+// ============ AUTH CHECK ============
 
-function showLoginScreen() {
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('adminDashboard').style.display = 'none';
-}
-
-function showDashboard() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('adminDashboard').style.display = 'flex';
+function checkAuth() {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    authToken = token;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminDashboard').style.display = 'flex';
+  } else {
+    setupLoginForm();
+  }
 }
 
 function setupLoginForm() {
-  const loginForm = document.getElementById('loginForm');
-  const errorDiv = document.getElementById('loginError');
-
-  loginForm.addEventListener('submit', async (e) => {
+  const form = document.getElementById('loginForm');
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const password = document.getElementById('password').value;
-    errorDiv.textContent = ''; // Clear previous errors
 
     try {
-      // Send password to backend for validation
       const response = await fetch(`${API_BASE}/admin/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })
       });
 
-      const data = await response.json();
-
-      if (data.success && data.token) {
-        // Save token and show dashboard
+      if (response.ok) {
+        const data = await response.json();
         authToken = data.token;
-        localStorage.setItem('adminToken', authToken);
-
-        // Reset form
-        loginForm.reset();
-
-        // Show dashboard
-        showDashboard();
-        setupLogout();
-        setupTabNavigation();
-        setupFormHandlers();
-        setupImageUploads();
-        loadDashboardStats();
-        loadAdminQuotes();
-        loadTemplates();
-        loadProducts();
-        loadGalleryItems();
+        localStorage.setItem('adminToken', data.token);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'flex';
       } else {
-        // Show error message
-        errorDiv.textContent = data.error || 'Invalid password. Please try again.';
-        errorDiv.style.display = 'block';
+        document.getElementById('loginError').textContent = 'Invalid password';
       }
     } catch (error) {
-      console.error('Login error:', error);
-      errorDiv.textContent = 'Connection error. Please try again.';
-      errorDiv.style.display = 'block';
+      document.getElementById('loginError').textContent = 'Login error: ' + error.message;
     }
   });
 }
@@ -101,53 +62,72 @@ function setupLoginForm() {
 // ============ LOGOUT ============
 
 function setupLogout() {
-  document.getElementById('logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('adminToken');
-    authToken = null;
-    showLoginScreen();
-    setupLoginForm();
-    document.getElementById('loginForm').reset();
-  });
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('adminToken');
+      window.location.href = '/';
+    });
+  }
 }
 
 // ============ TAB NAVIGATION ============
 
 function setupTabNavigation() {
-  document.querySelectorAll('.tab-link').forEach(link => {
+  // Top tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab(btn.dataset.tab);
+    });
+  });
+
+  // Sidebar links
+  document.querySelectorAll('.sidebar-link').forEach(link => {
+    if (link.id === 'logoutBtn') return;
+
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabName = link.dataset.tab;
-
-      // Remove active class from all links and tabs
-      document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
-      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-
-      // Add active class to clicked tab
-      link.classList.add('active');
-      document.getElementById(tabName + 'Tab').classList.add('active');
-
-      // Load data for tab
-      if (tabName === 'quotes') {
-        loadAdminQuotes();
-      } else if (tabName === 'products') {
-        loadProducts();
-      } else if (tabName === 'gallery') {
-        loadGalleryItems();
-      } else if (tabName === 'pricing') {
-        loadProducts(); // Pricing tab also needs product data
-      } else if (tabName === 'templates') {
-        loadTemplates();
+      if (tabName) {
+        switchTab(tabName);
       }
     });
   });
+}
+
+function switchTab(tabName) {
+  // Remove active class from all buttons and content
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+  // Add active class to clicked tab
+  document.querySelectorAll(`[data-tab="${tabName}"]`).forEach(el => {
+    el.classList.add('active');
+  });
+
+  const tabContent = document.getElementById(tabName);
+  if (tabContent) {
+    tabContent.classList.add('active');
+  }
+
+  // Load data for tab
+  if (tabName === 'quotes') {
+    loadAdminQuotes();
+  } else if (tabName === 'templates') {
+    loadTemplates();
+  } else if (tabName === 'products') {
+    loadProducts();
+    loadGallery();
+  }
 }
 
 // ============ DASHBOARD STATS ============
 
 async function loadDashboardStats() {
   try {
-    // For now, use placeholder values
-    // In a real system, these would come from your database
     document.getElementById('todayEnquiries').textContent = '0';
     document.getElementById('quotesAwaitingResponse').textContent = '0';
     document.getElementById('ordersInProduction').textContent = '0';
@@ -164,7 +144,6 @@ async function loadAdminQuotes() {
     const tbody = document.getElementById('quotesTableBody');
     if (!tbody) return;
 
-    // Placeholder: In a real system, fetch from /api/admin/quotes
     tbody.innerHTML = `
       <tr>
         <td colspan="5" style="text-align: center; color: #9ca3af; padding: 40px 12px;">
@@ -180,225 +159,84 @@ async function loadAdminQuotes() {
 // ============ TEMPLATE MANAGEMENT ============
 
 function loadTemplates(filterType = null) {
-  if (!authToken) {
-    console.warn('Not authenticated');
-    return;
-  }
-
   fetch(`${API_BASE}/admin/templates`, {
     headers: { 'Authorization': `Bearer ${authToken}` }
   })
-  .then(r => {
-    if (r.status === 401) {
-      // Token expired, redirect to login
-      localStorage.removeItem('adminToken');
-      authToken = null;
-      showLoginScreen();
-      setupLoginForm();
-      throw new Error('Authentication expired');
-    }
-    return r.json();
-  })
+  .then(r => r.json())
   .then(templates => {
     if (filterType) {
       templates = templates.filter(t => t.type === filterType);
     }
     displayTemplates(templates);
   })
-  .catch(err => {
-    console.error('Error loading templates:', err);
-    const list = document.getElementById('templatesList');
-    if (list) {
-      list.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 40px 0;">Templates will be managed in the Products & Gallery section.</p>';
-    }
+  .catch(error => {
+    console.error('Error loading templates:', error);
+    document.getElementById('templatesList').innerHTML = '<p style="color: #9ca3af;">Error loading templates</p>';
   });
 }
 
 function displayTemplates(templates) {
   const list = document.getElementById('templatesList');
+  if (!list) return;
+
   if (!templates || templates.length === 0) {
-    list.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 40px 0;">No templates yet. Visit Products & Gallery to create templates.</p>';
+    list.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 40px;">No templates yet. Create your first template.</p>';
     return;
   }
 
   list.innerHTML = templates.map(t => `
-    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
-      <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">
-        <div>
-          <h3 style="margin: 0 0 5px 0;">${t.name}</h3>
-          <p style="margin: 0; color: #666; font-size: 14px;">${t.description || 'No description'}</p>
-          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Type: ${t.type}${t.isDefault ? ' • <strong style="color: #0066cc;">Default</strong>' : ''}</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <button onclick="editTemplate('${t.id}')" class="btn btn-secondary" style="font-size: 12px;">Edit</button>
-          <button onclick="previewTemplate('${t.id}')" class="btn btn-secondary" style="font-size: 12px;">Preview</button>
-        </div>
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+      <h3>${t.name}</h3>
+      <p style="color: #6b7280; margin: 10px 0;">${t.type}</p>
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button onclick="editTemplate(${t.id})" class="btn btn-primary" style="padding: 8px 15px; font-size: 13px;">Edit</button>
+        <button onclick="deleteTemplate(${t.id})" class="btn btn-delete" style="padding: 8px 15px; font-size: 13px;">Delete</button>
       </div>
     </div>
   `).join('');
 }
 
-function editTemplate(id) {
-  if (!authToken) {
-    alert('Not authenticated');
-    return;
-  }
-
-  fetch(`${API_BASE}/admin/templates/${id}`, {
-    headers: { 'Authorization': `Bearer ${authToken}` }
-  })
-  .then(r => r.json())
-  .then(template => openTemplateEditor(template))
-  .catch(err => console.error('Error loading template:', err));
-}
-
 function newTemplate() {
-  openTemplateEditor(null);
-}
+  const name = prompt('Template name:');
+  if (!name) return;
 
-function openTemplateEditor(template) {
-  const modal = document.createElement('div');
-  modal.className = 'modal show';
-  modal.innerHTML = `
-    <div class="modal-content">
-      <span class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</span>
-      <h2>${template ? 'Edit Template' : 'New Template'}</h2>
-      <form onsubmit="saveTemplate(event, '${template?.id || ''}')">
-        <div class="form-group">
-          <label>Template Name</label>
-          <input type="text" name="name" value="${template?.name || ''}" required>
-        </div>
-        <div class="form-group">
-          <label>Type</label>
-          <select name="type" ${template ? 'disabled' : ''} required>
-            <option value="quote" ${template?.type === 'quote' ? 'selected' : ''}>Quote</option>
-            <option value="invoice" ${template?.type === 'invoice' ? 'selected' : ''}>Invoice</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <input type="text" name="description" value="${template?.description || ''}">
-        </div>
-        <div class="form-group">
-          <label>HTML Content (use {{PLACEHOLDER}} for variables)</label>
-          <textarea name="content" style="font-family: monospace; min-height: 400px; width: 100%;" required>${template?.content || ''}</textarea>
-          ${template?.placeholders ? `<p style="font-size: 12px; color: #666; margin-top: 5px;">Detected placeholders: ${template.placeholders.join(', ')}</p>` : ''}
-        </div>
-        <div class="btn-group">
-          <button type="submit" class="btn btn-primary">Save Template</button>
-          <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
-        </div>
-      </form>
-    </div>
-  `;
-  document.body.appendChild(modal);
+  const type = prompt('Template type (email):');
+  if (!type) return;
 
-  modal.querySelector('.modal-close').addEventListener('click', () => {
-    modal.remove();
-  });
+  const subject = prompt('Email subject:');
+  if (!subject) return;
 
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.remove();
-    }
-  });
-}
-
-function saveTemplate(event, templateId) {
-  if (!authToken) {
-    alert('Not authenticated');
-    return;
-  }
-
-  event.preventDefault();
-  const form = event.target;
-  const data = {
-    name: form.name.value,
-    type: form.type.value,
-    description: form.description.value,
-    content: form.content.value
-  };
-
-  const url = templateId
-    ? `${API_BASE}/admin/templates/${templateId}`
-    : `${API_BASE}/admin/templates`;
-
-  const options = {
-    method: templateId ? 'PATCH' : 'POST',
+  fetch(`${API_BASE}/admin/templates`, {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${authToken}`
     },
-    body: JSON.stringify(data)
-  };
-
-  fetch(url, options)
-    .then(r => r.json())
-    .then(result => {
-      if (result.error) {
-        alert('Error: ' + result.error);
-      } else {
-        alert('Template saved successfully!');
-        loadTemplates();
-        document.querySelector('.modal').remove();
-      }
-    })
-    .catch(err => {
-      console.error('Error saving template:', err);
-      alert('Error saving template');
-    });
-}
-
-function previewTemplate(id) {
-  if (!authToken) {
-    alert('Not authenticated');
-    return;
-  }
-
-  fetch(`${API_BASE}/admin/templates/${id}`, {
-    headers: { 'Authorization': `Bearer ${authToken}` }
+    body: JSON.stringify({ name, type, subject, body: '' })
   })
   .then(r => r.json())
-  .then(template => {
-    const preview = window.open('', 'Template Preview', 'width=900,height=600');
-    preview.document.write(template.content);
-    preview.document.close();
+  .then(() => loadTemplates())
+  .catch(error => console.error('Error creating template:', error));
+}
+
+function editTemplate(id) {
+  alert('Template editing coming soon');
+}
+
+function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+
+  fetch(`${API_BASE}/admin/templates/${id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${authToken}` }
   })
-  .catch(err => console.error('Error previewing template:', err));
+  .then(() => loadTemplates())
+  .catch(error => console.error('Error deleting template:', error));
 }
-
-// ============ MODAL HELPERS ============
-
-function closeEditModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.remove('show');
-  }
-  editingProductId = null;
-  editingGalleryId = null;
-}
-
-// Close modals when clicking outside
-document.addEventListener('click', (e) => {
-  const productModal = document.getElementById('editProductModal');
-  const galleryModal = document.getElementById('editGalleryModal');
-
-  if (e.target === productModal) {
-    closeEditModal('editProductModal');
-  }
-  if (e.target === galleryModal) {
-    closeEditModal('editGalleryModal');
-  }
-});
 
 // ============ BUSINESS SETTINGS ============
 
 function saveBusinessSettings(event) {
-  if (!authToken) {
-    alert('Not authenticated');
-    return;
-  }
-
   event.preventDefault();
 
   const settings = {
@@ -418,192 +256,28 @@ function saveBusinessSettings(event) {
     body: JSON.stringify(settings)
   })
   .then(r => r.json())
-  .then(result => {
-    if (result.error) {
-      alert('Error: ' + result.error);
-    } else {
-      alert('Settings saved successfully!');
-    }
-  })
-  .catch(err => {
-    console.error('Error saving settings:', err);
-    alert('Error saving settings. Changes saved locally.');
-  });
+  .then(() => alert('Settings saved!'))
+  .catch(error => console.error('Error saving settings:', error));
 }
 
-// ============ FORM HANDLERS ============
-
-function setupFormHandlers() {
-  // Product Form
-  const productForm = document.getElementById('productImageForm');
-  if (productForm) {
-    productForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData();
-      const fileInput = document.getElementById('productImageInput');
-
-      if (fileInput.files.length > 0) {
-        formData.append('image', fileInput.files[0]);
-        formData.append('title', document.getElementById('productTitle').value);
-        formData.append('category', document.getElementById('productCategory').value);
-        formData.append('description', document.getElementById('productDescription').value);
-
-        try {
-          const response = await fetch(`${API_BASE}/admin/upload`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: formData
-          });
-
-          const data = await response.json();
-          if (data.success) {
-            document.getElementById('productUploadMessage').innerHTML = '<p style="color: green;">✓ Product added successfully!</p>';
-            resetProductForm();
-            loadProducts();
-          } else {
-            document.getElementById('productUploadMessage').innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
-          }
-        } catch (error) {
-          console.error('Error uploading product:', error);
-          document.getElementById('productUploadMessage').innerHTML = '<p style="color: red;">Error uploading product</p>';
-        }
-      }
-    });
-  }
-
-  // Gallery Form
-  const galleryForm = document.getElementById('galleryForm');
-  if (galleryForm) {
-    galleryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData();
-      const fileInput = document.getElementById('galleryImageInput');
-
-      if (fileInput.files.length > 0) {
-        formData.append('image', fileInput.files[0]);
-        formData.append('title', document.getElementById('galleryTitle').value);
-        formData.append('category', document.getElementById('galleryCategory').value);
-        formData.append('description', document.getElementById('galleryDescription').value);
-
-        try {
-          const response = await fetch(`${API_BASE}/admin/gallery`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: formData
-          });
-
-          const data = await response.json();
-          if (data.success) {
-            document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: green;">✓ Gallery item added successfully!</p>';
-            resetGalleryForm();
-            loadGalleryItems();
-          } else {
-            document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
-          }
-        } catch (error) {
-          console.error('Error uploading gallery item:', error);
-          document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: red;">Error uploading gallery item</p>';
-        }
-      }
-    });
-  }
-}
-
-// ============ IMAGE UPLOADS ============
-
-function setupImageUploads() {
-  // Product image upload
-  const productUpload = document.getElementById('productImageUpload');
-  const productInput = document.getElementById('productImageInput');
-  const productPreview = document.getElementById('productImagePreview');
-
-  if (productUpload && productInput) {
-    productUpload.addEventListener('click', () => productInput.click());
-    productUpload.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      productUpload.style.backgroundColor = '#f0f0f0';
-    });
-    productUpload.addEventListener('dragleave', () => {
-      productUpload.style.backgroundColor = '#fafafa';
-    });
-    productUpload.addEventListener('drop', (e) => {
-      e.preventDefault();
-      productUpload.style.backgroundColor = '#fafafa';
-      productInput.files = e.dataTransfer.files;
-      previewImage(productInput, productPreview);
-    });
-
-    productInput.addEventListener('change', () => {
-      previewImage(productInput, productPreview);
-    });
-  }
-
-  // Gallery image upload
-  const galleryUpload = document.getElementById('galleryImageUpload');
-  const galleryInput = document.getElementById('galleryImageInput');
-  const galleryPreview = document.getElementById('galleryImagePreview');
-
-  if (galleryUpload && galleryInput) {
-    galleryUpload.addEventListener('click', () => galleryInput.click());
-    galleryUpload.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      galleryUpload.style.backgroundColor = '#f0f0f0';
-    });
-    galleryUpload.addEventListener('dragleave', () => {
-      galleryUpload.style.backgroundColor = '#fafafa';
-    });
-    galleryUpload.addEventListener('drop', (e) => {
-      e.preventDefault();
-      galleryUpload.style.backgroundColor = '#fafafa';
-      galleryInput.files = e.dataTransfer.files;
-      previewImage(galleryInput, galleryPreview);
-    });
-
-    galleryInput.addEventListener('change', () => {
-      previewImage(galleryInput, galleryPreview);
-    });
-  }
-}
-
-function previewImage(input, preview) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      preview.src = e.target.result;
-      preview.style.display = 'block';
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-function resetProductForm() {
-  document.getElementById('productImageForm').reset();
-  document.getElementById('productImagePreview').style.display = 'none';
-  document.getElementById('productUploadMessage').innerHTML = '';
-}
-
-function resetGalleryForm() {
-  document.getElementById('galleryForm').reset();
-  document.getElementById('galleryImagePreview').style.display = 'none';
-  document.getElementById('galleryUploadMessage').innerHTML = '';
-}
-
-// ============ PRODUCTS ============
+// ============ PRODUCTS MANAGEMENT ============
 
 async function loadProducts() {
   try {
-    const response = await fetch(`${API_BASE}/products`);
+    const response = await fetch(`${API_BASE}/products`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (!response.ok) throw new Error('Failed to load products');
+
     allProducts = await response.json();
     displayProducts();
-    displayPricing();
   } catch (error) {
     console.error('Error loading products:', error);
+    const list = document.getElementById('productsList');
+    if (list) {
+      list.innerHTML = '<p style="grid-column: 1/-1; color: #9ca3af; text-align: center; padding: 40px;">Error loading products</p>';
+    }
   }
 }
 
@@ -611,101 +285,451 @@ function displayProducts() {
   const list = document.getElementById('productsList');
   if (!list) return;
 
-  if (allProducts.length === 0) {
-    list.innerHTML = '<p style="color: #9ca3af;">No products yet. Add one below.</p>';
+  if (!allProducts || allProducts.length === 0) {
+    list.innerHTML = '<p style="grid-column: 1/-1; color: #9ca3af; text-align: center; padding: 40px;">No products yet. Add one below.</p>';
     return;
   }
 
   list.innerHTML = allProducts.map(product => `
-    <div style="border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-      <div style="display: grid; grid-template-columns: 100px 1fr auto; gap: 15px; align-items: center;">
-        ${product.image ? `<img src="${product.image}" alt="${product.name}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 100px; height: 100px; background: #f0f0f0; border-radius: 4px;"></div>'}
-        <div>
-          <h3 style="margin: 0 0 5px 0;">${product.name}</h3>
-          <p style="margin: 0; color: #666; font-size: 14px;">${product.description || 'No description'}</p>
-          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Category: ${product.category}</p>
-        </div>
-        <div>
-          <p style="margin: 0; font-weight: bold;">R ${product.basePrice}</p>
+    <div class="product-item">
+      <div class="product-image">
+        ${product.image ? `<img src="${product.image}" alt="${product.name}">` : '<div style="color: #9ca3af;">No image</div>'}
+      </div>
+      <div class="product-info">
+        <div class="product-name">${product.name}</div>
+        <div class="product-actions">
+          <button class="btn-edit-image" onclick="editProductImage(${product.id})">Change Image</button>
+          <button class="btn-edit-title" onclick="editProductTitle(${product.id})">Edit Details</button>
+          <button class="btn-delete" onclick="deleteProduct(${product.id})">Delete</button>
         </div>
       </div>
     </div>
   `).join('');
 }
 
-function displayPricing() {
-  const tbody = document.getElementById('pricingTableBody');
-  if (!tbody) return;
+function editProductImage(productId) {
+  const modal = document.getElementById('editModal');
+  const form = document.getElementById('editForm');
 
-  tbody.innerHTML = allProducts.map(product => `
-    <tr>
-      <td>${product.name}</td>
-      <td>${product.category}</td>
-      <td>R ${product.basePrice}</td>
-      <td>Quantity tiers</td>
-      <td><button class="btn btn-secondary" style="font-size: 12px;">Edit</button></td>
-    </tr>
-  `).join('');
+  document.getElementById('editModalTitle').textContent = 'Change Product Image';
+
+  form.innerHTML = `
+    <div class="form-group">
+      <label>Product Image</label>
+      <div class="image-upload" id="editImageUpload">
+        <div>📸 Click to upload or drag and drop</div>
+        <div style="font-size: 12px; color: #9ca3af; margin-top: 5px;">PNG, JPG, GIF</div>
+        <input type="file" id="editImageInput" accept="image/*">
+      </div>
+      <img id="editImagePreview" class="image-preview" style="display:none;">
+    </div>
+    <div class="btn-group">
+      <button type="button" class="btn btn-primary" onclick="saveProductImage(event, ${productId})">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+  `;
+
+  setupImageUpload('editImageUpload', 'editImageInput', 'editImagePreview');
+  modal.classList.add('show');
+  editingProductId = productId;
 }
 
-// ============ GALLERY ============
+function editProductTitle(productId) {
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
 
-async function loadGalleryItems() {
+  const modal = document.getElementById('editModal');
+  const form = document.getElementById('editForm');
+
+  document.getElementById('editModalTitle').textContent = 'Edit Product Details';
+
+  form.innerHTML = `
+    <div class="form-group">
+      <label>Product Name</label>
+      <input type="text" id="editNameInput" value="${product.name}" required>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="editDescInput">${product.description || ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="editCategoryInput" required>
+        <option value="Printing" ${product.category === 'Printing' ? 'selected' : ''}>Printing</option>
+        <option value="Clothing" ${product.category === 'Clothing' ? 'selected' : ''}>Clothing</option>
+        <option value="Signage" ${product.category === 'Signage' ? 'selected' : ''}>Signage</option>
+        <option value="Vehicle Branding" ${product.category === 'Vehicle Branding' ? 'selected' : ''}>Vehicle Branding</option>
+        <option value="Promotional Items" ${product.category === 'Promotional Items' ? 'selected' : ''}>Promotional Items</option>
+      </select>
+    </div>
+    <div class="btn-group">
+      <button type="button" class="btn btn-primary" onclick="saveProductTitle(event, ${productId})">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+  `;
+
+  modal.classList.add('show');
+}
+
+function saveProductImage(event, productId) {
+  event.preventDefault();
+  const input = document.getElementById('editImageInput');
+
+  if (!input.files.length) {
+    alert('Please select an image');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('image', input.files[0]);
+
+  fetch(`${API_BASE}/admin/products/${productId}/image`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+    body: formData
+  })
+  .then(r => r.json())
+  .then(() => {
+    closeEditModal();
+    loadProducts();
+  })
+  .catch(error => {
+    console.error('Error saving image:', error);
+    alert('Error saving image');
+  });
+}
+
+function saveProductTitle(event, productId) {
+  event.preventDefault();
+
+  const data = {
+    name: document.getElementById('editNameInput').value,
+    description: document.getElementById('editDescInput').value,
+    category: document.getElementById('editCategoryInput').value
+  };
+
+  fetch(`${API_BASE}/admin/products/${productId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(() => {
+    closeEditModal();
+    loadProducts();
+  })
+  .catch(error => {
+    console.error('Error saving product:', error);
+    alert('Error saving product');
+  });
+}
+
+function deleteProduct(productId) {
+  if (!confirm('Delete this product?')) return;
+
+  fetch(`${API_BASE}/admin/products/${productId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(() => loadProducts())
+  .catch(error => {
+    console.error('Error deleting product:', error);
+    alert('Error deleting product');
+  });
+}
+
+function resetProductForm() {
+  document.getElementById('productImageForm').reset();
+  document.getElementById('productImagePreview').style.display = 'none';
+}
+
+// ============ GALLERY MANAGEMENT ============
+
+async function loadGallery() {
   try {
-    const response = await fetch(`${API_BASE}/admin/gallery`, {
+    const response = await fetch(`${API_BASE}/gallery`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
+
+    if (!response.ok) throw new Error('Failed to load gallery');
+
     allGalleryItems = await response.json();
-    displayGalleryItems();
+    displayGallery();
   } catch (error) {
     console.error('Error loading gallery:', error);
+    const list = document.getElementById('galleryList');
+    if (list) {
+      list.innerHTML = '<p style="grid-column: 1/-1; color: #9ca3af; text-align: center; padding: 40px;">Error loading gallery</p>';
+    }
   }
 }
 
-function displayGalleryItems() {
+function displayGallery() {
   const list = document.getElementById('galleryList');
   if (!list) return;
 
-  if (allGalleryItems.length === 0) {
-    list.innerHTML = '<p style="color: #9ca3af;">No gallery items yet. Add one above.</p>';
+  if (!allGalleryItems || allGalleryItems.length === 0) {
+    list.innerHTML = '<p style="grid-column: 1/-1; color: #9ca3af; text-align: center; padding: 40px;">No gallery items yet. Add one below.</p>';
     return;
   }
 
   list.innerHTML = allGalleryItems.map(item => `
-    <div style="border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-      <div style="display: grid; grid-template-columns: 120px 1fr auto; gap: 15px; align-items: start;">
-        <img src="${item.imageUrl || item.image}" alt="${item.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;">
-        <div>
-          <h3 style="margin: 0 0 5px 0;">${item.title}</h3>
-          <p style="margin: 0; color: #666; font-size: 14px;">${item.description || 'No description'}</p>
-          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Category: ${item.category}</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <button class="btn btn-secondary" style="font-size: 12px;">Edit</button>
-          <button class="btn btn-danger" style="font-size: 12px;" onclick="deleteGalleryItem(${item.id})">Delete</button>
+    <div class="product-item">
+      <div class="product-image">
+        ${item.image ? `<img src="${item.image}" alt="${item.title}">` : '<div style="color: #9ca3af;">No image</div>'}
+      </div>
+      <div class="product-info">
+        <div class="product-name">${item.title}</div>
+        <div class="product-actions">
+          <button class="btn-edit-title" onclick="editGalleryItem(${item.id})">Edit</button>
+          <button class="btn-delete" onclick="deleteGalleryItem(${item.id})">Delete</button>
         </div>
       </div>
     </div>
   `).join('');
 }
 
-async function deleteGalleryItem(id) {
-  if (confirm('Are you sure you want to delete this gallery item?')) {
-    try {
-      const response = await fetch(`${API_BASE}/admin/gallery/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
+function editGalleryItem(itemId) {
+  const item = allGalleryItems.find(i => i.id === itemId);
+  if (!item) return;
 
-      if (response.ok) {
-        alert('Gallery item deleted successfully!');
-        loadGalleryItems();
-      } else {
-        alert('Error deleting gallery item');
-      }
-    } catch (error) {
-      console.error('Error deleting gallery item:', error);
-      alert('Error deleting gallery item');
+  const modal = document.getElementById('editModal');
+  const form = document.getElementById('editForm');
+
+  document.getElementById('editModalTitle').textContent = 'Edit Gallery Item';
+
+  form.innerHTML = `
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="editTitleInput" value="${item.title}" required>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="editDescInput">${item.description || ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="editCategoryInput" required>
+        <option value="Clothing" ${item.category === 'Clothing' ? 'selected' : ''}>Clothing</option>
+        <option value="Printing" ${item.category === 'Printing' ? 'selected' : ''}>Printing</option>
+        <option value="Vehicle Branding" ${item.category === 'Vehicle Branding' ? 'selected' : ''}>Vehicle Branding</option>
+        <option value="Signage" ${item.category === 'Signage' ? 'selected' : ''}>Signage</option>
+        <option value="Promotional Items" ${item.category === 'Promotional Items' ? 'selected' : ''}>Promotional Items</option>
+        <option value="Custom" ${item.category === 'Custom' ? 'selected' : ''}>Custom</option>
+      </select>
+    </div>
+    <div class="btn-group">
+      <button type="button" class="btn btn-primary" onclick="saveGalleryItem(event, ${itemId})">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+  `;
+
+  modal.classList.add('show');
+}
+
+function saveGalleryItem(event, itemId) {
+  event.preventDefault();
+
+  const data = {
+    title: document.getElementById('editTitleInput').value,
+    description: document.getElementById('editDescInput').value,
+    category: document.getElementById('editCategoryInput').value
+  };
+
+  fetch(`${API_BASE}/gallery/${itemId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(() => {
+    closeEditModal();
+    loadGallery();
+  })
+  .catch(error => {
+    console.error('Error saving gallery item:', error);
+    alert('Error saving gallery item');
+  });
+}
+
+function deleteGalleryItem(itemId) {
+  if (!confirm('Delete this gallery item?')) return;
+
+  fetch(`${API_BASE}/gallery/${itemId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(() => loadGallery())
+  .catch(error => {
+    console.error('Error deleting gallery item:', error);
+    alert('Error deleting gallery item');
+  });
+}
+
+function resetGalleryForm() {
+  document.getElementById('galleryForm').reset();
+  document.getElementById('galleryImagePreview').style.display = 'none';
+}
+
+// ============ IMAGE UPLOAD HELPERS ============
+
+function setupImageUpload(uploadId, inputId, previewId) {
+  const uploadDiv = document.getElementById(uploadId);
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+
+  if (!uploadDiv) return;
+
+  uploadDiv.addEventListener('click', () => input.click());
+  uploadDiv.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadDiv.style.borderColor = '#667eea';
+  });
+  uploadDiv.addEventListener('dragleave', () => {
+    uploadDiv.style.borderColor = '#d1d5db';
+  });
+  uploadDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadDiv.style.borderColor = '#d1d5db';
+    if (e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      showPreview(input, preview);
     }
+  });
+
+  input.addEventListener('change', () => showPreview(input, preview));
+}
+
+function showPreview(input, preview) {
+  if (!input.files[0]) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// ============ MODAL MANAGEMENT ============
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('show');
+  editingProductId = null;
+  editingGalleryId = null;
+}
+
+document.addEventListener('click', (e) => {
+  const modal = document.getElementById('editModal');
+  if (e.target === modal) {
+    closeEditModal();
   }
+});
+
+// ============ FORM SETUP ============
+
+// Setup drag-drop for product image
+window.addEventListener('DOMContentLoaded', () => {
+  setupImageUpload('productImageUpload', 'productImageInput', 'productImagePreview');
+  setupImageUpload('galleryImageUpload', 'galleryImageInput', 'galleryImagePreview');
+
+  // Product form submission
+  const productForm = document.getElementById('productImageForm');
+  if (productForm) {
+    productForm.addEventListener('submit', uploadProductImage);
+  }
+
+  // Gallery form submission
+  const galleryForm = document.getElementById('galleryForm');
+  if (galleryForm) {
+    galleryForm.addEventListener('submit', uploadGalleryImage);
+  }
+});
+
+function uploadProductImage(event) {
+  event.preventDefault();
+
+  const name = document.getElementById('productTitle').value;
+  const description = document.getElementById('productDescription').value;
+  const category = document.getElementById('productCategory').value;
+  const imageInput = document.getElementById('productImageInput');
+
+  if (!name) {
+    alert('Please enter a product name');
+    return;
+  }
+
+  if (!imageInput.files.length) {
+    alert('Please select an image');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('description', description);
+  formData.append('category', category);
+  formData.append('image', imageInput.files[0]);
+
+  fetch(`${API_BASE}/admin/products`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+    body: formData
+  })
+  .then(r => r.json())
+  .then(() => {
+    resetProductForm();
+    loadProducts();
+    alert('Product added successfully!');
+  })
+  .catch(error => {
+    console.error('Error uploading product:', error);
+    alert('Error uploading product');
+  });
+}
+
+function uploadGalleryImage(event) {
+  event.preventDefault();
+
+  const title = document.getElementById('galleryTitle').value;
+  const description = document.getElementById('galleryDescription').value;
+  const category = document.getElementById('galleryCategory').value;
+  const imageInput = document.getElementById('galleryImageInput');
+
+  if (!title) {
+    alert('Please enter a title');
+    return;
+  }
+
+  if (!imageInput.files.length) {
+    alert('Please select an image');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', description);
+  formData.append('category', category);
+  formData.append('image', imageInput.files[0]);
+
+  fetch(`${API_BASE}/gallery`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${authToken}` },
+    body: formData
+  })
+  .then(r => r.json())
+  .then(() => {
+    resetGalleryForm();
+    loadGallery();
+    alert('Gallery item added successfully!');
+  })
+  .catch(error => {
+    console.error('Error uploading gallery item:', error);
+    alert('Error uploading gallery item');
+  });
 }
