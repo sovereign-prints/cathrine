@@ -2,11 +2,15 @@
 
 .login-screen {
   min-height: 100vh;
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
   padding: 20px;
+}
+
+.login-screen[style*="display: none"] {
+  display: none !important;
 }
 
 .login-box {
@@ -52,9 +56,13 @@
 /* ============ ADMIN DASHBOARD ============ */
 
 .admin-dashboard {
-  display: flex;
+  display: flex !important;
   min-height: 100vh;
   background: var(--bg);
+}
+
+.admin-dashboard[style*="display: none"] {
+  display: none !important;
 }
 
 /* ============ SIDEBAR ============ */
