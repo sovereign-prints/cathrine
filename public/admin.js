@@ -430,3 +430,282 @@ function saveBusinessSettings(event) {
     alert('Error saving settings. Changes saved locally.');
   });
 }
+
+// ============ FORM HANDLERS ============
+
+function setupFormHandlers() {
+  // Product Form
+  const productForm = document.getElementById('productImageForm');
+  if (productForm) {
+    productForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      const fileInput = document.getElementById('productImageInput');
+
+      if (fileInput.files.length > 0) {
+        formData.append('image', fileInput.files[0]);
+        formData.append('title', document.getElementById('productTitle').value);
+        formData.append('category', document.getElementById('productCategory').value);
+        formData.append('description', document.getElementById('productDescription').value);
+
+        try {
+          const response = await fetch(`${API_BASE}/admin/upload`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: formData
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            document.getElementById('productUploadMessage').innerHTML = '<p style="color: green;">✓ Product added successfully!</p>';
+            resetProductForm();
+            loadProducts();
+          } else {
+            document.getElementById('productUploadMessage').innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+          }
+        } catch (error) {
+          console.error('Error uploading product:', error);
+          document.getElementById('productUploadMessage').innerHTML = '<p style="color: red;">Error uploading product</p>';
+        }
+      }
+    });
+  }
+
+  // Gallery Form
+  const galleryForm = document.getElementById('galleryForm');
+  if (galleryForm) {
+    galleryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      const fileInput = document.getElementById('galleryImageInput');
+
+      if (fileInput.files.length > 0) {
+        formData.append('image', fileInput.files[0]);
+        formData.append('title', document.getElementById('galleryTitle').value);
+        formData.append('category', document.getElementById('galleryCategory').value);
+        formData.append('description', document.getElementById('galleryDescription').value);
+
+        try {
+          const response = await fetch(`${API_BASE}/admin/gallery`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: formData
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: green;">✓ Gallery item added successfully!</p>';
+            resetGalleryForm();
+            loadGalleryItems();
+          } else {
+            document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+          }
+        } catch (error) {
+          console.error('Error uploading gallery item:', error);
+          document.getElementById('galleryUploadMessage').innerHTML = '<p style="color: red;">Error uploading gallery item</p>';
+        }
+      }
+    });
+  }
+}
+
+// ============ IMAGE UPLOADS ============
+
+function setupImageUploads() {
+  // Product image upload
+  const productUpload = document.getElementById('productImageUpload');
+  const productInput = document.getElementById('productImageInput');
+  const productPreview = document.getElementById('productImagePreview');
+
+  if (productUpload && productInput) {
+    productUpload.addEventListener('click', () => productInput.click());
+    productUpload.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      productUpload.style.backgroundColor = '#f0f0f0';
+    });
+    productUpload.addEventListener('dragleave', () => {
+      productUpload.style.backgroundColor = '#fafafa';
+    });
+    productUpload.addEventListener('drop', (e) => {
+      e.preventDefault();
+      productUpload.style.backgroundColor = '#fafafa';
+      productInput.files = e.dataTransfer.files;
+      previewImage(productInput, productPreview);
+    });
+
+    productInput.addEventListener('change', () => {
+      previewImage(productInput, productPreview);
+    });
+  }
+
+  // Gallery image upload
+  const galleryUpload = document.getElementById('galleryImageUpload');
+  const galleryInput = document.getElementById('galleryImageInput');
+  const galleryPreview = document.getElementById('galleryImagePreview');
+
+  if (galleryUpload && galleryInput) {
+    galleryUpload.addEventListener('click', () => galleryInput.click());
+    galleryUpload.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      galleryUpload.style.backgroundColor = '#f0f0f0';
+    });
+    galleryUpload.addEventListener('dragleave', () => {
+      galleryUpload.style.backgroundColor = '#fafafa';
+    });
+    galleryUpload.addEventListener('drop', (e) => {
+      e.preventDefault();
+      galleryUpload.style.backgroundColor = '#fafafa';
+      galleryInput.files = e.dataTransfer.files;
+      previewImage(galleryInput, galleryPreview);
+    });
+
+    galleryInput.addEventListener('change', () => {
+      previewImage(galleryInput, galleryPreview);
+    });
+  }
+}
+
+function previewImage(input, preview) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function resetProductForm() {
+  document.getElementById('productImageForm').reset();
+  document.getElementById('productImagePreview').style.display = 'none';
+  document.getElementById('productUploadMessage').innerHTML = '';
+}
+
+function resetGalleryForm() {
+  document.getElementById('galleryForm').reset();
+  document.getElementById('galleryImagePreview').style.display = 'none';
+  document.getElementById('galleryUploadMessage').innerHTML = '';
+}
+
+// ============ PRODUCTS ============
+
+async function loadProducts() {
+  try {
+    const response = await fetch(`${API_BASE}/products`);
+    allProducts = await response.json();
+    displayProducts();
+    displayPricing();
+  } catch (error) {
+    console.error('Error loading products:', error);
+  }
+}
+
+function displayProducts() {
+  const list = document.getElementById('productsList');
+  if (!list) return;
+
+  if (allProducts.length === 0) {
+    list.innerHTML = '<p style="color: #9ca3af;">No products yet. Add one below.</p>';
+    return;
+  }
+
+  list.innerHTML = allProducts.map(product => `
+    <div style="border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+      <div style="display: grid; grid-template-columns: 100px 1fr auto; gap: 15px; align-items: center;">
+        ${product.image ? `<img src="${product.image}" alt="${product.name}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 100px; height: 100px; background: #f0f0f0; border-radius: 4px;"></div>'}
+        <div>
+          <h3 style="margin: 0 0 5px 0;">${product.name}</h3>
+          <p style="margin: 0; color: #666; font-size: 14px;">${product.description || 'No description'}</p>
+          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Category: ${product.category}</p>
+        </div>
+        <div>
+          <p style="margin: 0; font-weight: bold;">R ${product.basePrice}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function displayPricing() {
+  const tbody = document.getElementById('pricingTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = allProducts.map(product => `
+    <tr>
+      <td>${product.name}</td>
+      <td>${product.category}</td>
+      <td>R ${product.basePrice}</td>
+      <td>Quantity tiers</td>
+      <td><button class="btn btn-secondary" style="font-size: 12px;">Edit</button></td>
+    </tr>
+  `).join('');
+}
+
+// ============ GALLERY ============
+
+async function loadGalleryItems() {
+  try {
+    const response = await fetch(`${API_BASE}/admin/gallery`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    allGalleryItems = await response.json();
+    displayGalleryItems();
+  } catch (error) {
+    console.error('Error loading gallery:', error);
+  }
+}
+
+function displayGalleryItems() {
+  const list = document.getElementById('galleryList');
+  if (!list) return;
+
+  if (allGalleryItems.length === 0) {
+    list.innerHTML = '<p style="color: #9ca3af;">No gallery items yet. Add one above.</p>';
+    return;
+  }
+
+  list.innerHTML = allGalleryItems.map(item => `
+    <div style="border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+      <div style="display: grid; grid-template-columns: 120px 1fr auto; gap: 15px; align-items: start;">
+        <img src="${item.imageUrl || item.image}" alt="${item.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;">
+        <div>
+          <h3 style="margin: 0 0 5px 0;">${item.title}</h3>
+          <p style="margin: 0; color: #666; font-size: 14px;">${item.description || 'No description'}</p>
+          <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Category: ${item.category}</p>
+        </div>
+        <div style="display: flex; gap: 5px;">
+          <button class="btn btn-secondary" style="font-size: 12px;">Edit</button>
+          <button class="btn btn-danger" style="font-size: 12px;" onclick="deleteGalleryItem(${item.id})">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteGalleryItem(id) {
+  if (confirm('Are you sure you want to delete this gallery item?')) {
+    try {
+      const response = await fetch(`${API_BASE}/admin/gallery/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      if (response.ok) {
+        alert('Gallery item deleted successfully!');
+        loadGalleryItems();
+      } else {
+        alert('Error deleting gallery item');
+      }
+    } catch (error) {
+      console.error('Error deleting gallery item:', error);
+      alert('Error deleting gallery item');
+    }
+  }
+}
