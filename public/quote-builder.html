@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sovereign Prints - Quote & Invoice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .toolbar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .quote-document {
+            background: white;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+
+        .header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .logo-section h1 {
+            font-size: 32px;
+            color: #667eea;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+
+        .logo-section p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .company-info {
+            text-align: right;
+        }
+
+        .company-info h3 {
+            color: #1f2937;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .company-info p {
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .quote-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .meta-item label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .meta-item input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .customer-section {
+            margin-bottom: 40px;
+        }
+
+        .customer-section h3 {
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .customer-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .line-items-section {
+            margin-bottom: 40px;
+        }
+
+        .line-items-section h3 {
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .line-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .line-items-table thead {
+            background: #f3f4f6;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .line-items-table th {
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            text-transform: uppercase;
+        }
+
+        .line-items-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .line-items-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .product-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .qty-input,
+        .price-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: right;
+        }
+
+        .line-total {
+            text-align: right;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .remove-btn {
+            padding: 6px 12px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .remove-btn:hover {
+            background: #dc2626;
+        }
+
+        .add-item-btn {
+            padding: 10px 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+        }
+
+        .add-item-btn:hover {
+            background: #2563eb;
+        }
+
+        .totals-section {
+            display: grid;
+            grid-template-columns: 1fr 250px;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .notes-section {
+            flex: 1;
+        }
+
+        .notes-section label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .notes-section textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            min-height: 80px;
+            font-family: inherit;
+        }
+
+        .totals {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .total-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .total-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .total-label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .total-value {
+            text-align: right;
+            color: #1f2937;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .footer {
+            border-top: 2px solid #667eea;
+            padding-top: 20px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .message {
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+
+        @media print {
+            .toolbar {
+                display: none;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .quote-document {
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                grid-template-columns: 1fr;
+            }
+
+            .company-info {
+                text-align: left;
+            }
+
+            .quote-meta {
+                grid-template-columns: 1fr;
+            }
+
+            .customer-fields {
+                grid-template-columns: 1fr;
+            }
+
+            .totals-section {
+                grid-template-columns: 1fr;
+            }
+
+            .quote-document {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="msgBox" class="message"></div>
+
+    <div class="toolbar">
+        <button class="btn btn-secondary" onclick="resetForm()">Clear</button>
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ Print PDF</button>
+        <button class="btn btn-primary" onclick="submitQuote()">✓ Submit Quote</button>
+    </div>
+
+    <div class="quote-document">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-section">
+                <h1>SOVEREIGN PRINTS</h1>
+                <p>Custom Printing & Branding Solutions</p>
+            </div>
+            <div class="company-info">
+                <h3>Business Details</h3>
+                <p id="companyEmail">hello@sovereignprints.co.za</p>
+                <p id="companyPhone">+27 (0) 12 345 6789</p>
+                <p id="companyLocation">Johannesburg, South Africa</p>
+            </div>
+        </div>
+
+        <!-- Quote Metadata -->
+        <div class="quote-meta">
+            <div class="meta-item">
+                <label>Quote #</label>
+                <input type="text" id="quoteNumber" readonly>
+            </div>
+            <div class="meta-item">
+                <label>Date</label>
+                <input type="date" id="quoteDate" readonly>
+            </div>
+            <div class="meta-item">
+                <label>Valid Until</label>
+                <input type="date" id="validUntil">
+            </div>
+        </div>
+
+        <!-- Customer Details -->
+        <div class="customer-section">
+            <h3>Customer Details</h3>
+            <div class="customer-fields">
+                <div class="form-group">
+                    <label>Customer Name *</label>
+                    <input type="text" id="custName" placeholder="Enter customer name" required>
+                </div>
+                <div class="form-group">
+                    <label>Company</label>
+                    <input type="text" id="custCompany" placeholder="Company name (optional)">
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="custEmail" placeholder="customer@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone *</label>
+                    <input type="tel" id="custPhone" placeholder="Phone number" required>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="line-items-section">
+            <h3>Line Items</h3>
+            <button class="add-item-btn" onclick="addLineItem()">+ Add Line Item</button>
+
+            <table class="line-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Product/Service</th>
+                        <th style="width: 15%;">Qty</th>
+                        <th style="width: 15%;">Unit Price</th>
+                        <th style="width: 20%;">Total</th>
+                        <th style="width: 10%;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="lineItemsBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Notes & Totals -->
+        <div class="totals-section">
+            <div class="notes-section">
+                <label>Additional Notes</label>
+                <textarea id="quoteNotes" placeholder="Add any special instructions or terms..."></textarea>
+            </div>
+
+            <div class="totals">
+                <div class="total-row">
+                    <div class="total-label">Subtotal:</div>
+                    <div class="total-value" id="subtotalDisplay">R 0.00</div>
+                </div>
+                <div class="total-row">
+                    <div class="total-label">TOTAL:</div>
+                    <div class="total-value" id="totalDisplay">R 0.00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Thank you for your business. For questions or revisions, please contact us.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let products = [];
+let lineItems = [];
+
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+    loadProducts();
+    setQuoteDefaults();
+    addLineItem();
+    loadBusinessSettings();
+});
+
+function loadProducts() {
+    fetch('/api/products')
+        .then(r => r.json())
+        .then(data => {
+            products = data || [];
+        })
+        .catch(e => console.log('Note: Products not available offline'));
+}
+
+function loadBusinessSettings() {
+    const settings = localStorage.getItem('businessSettings');
+    if (settings) {
+        const data = JSON.parse(settings);
+        document.getElementById('companyEmail').textContent = data.email || 'hello@sovereignprints.co.za';
+        document.getElementById('companyPhone').textContent = data.phone || '+27 (0) 12 345 6789';
+        document.getElementById('companyLocation').textContent = data.location || 'Johannesburg, South Africa';
+    }
+}
+
+function setQuoteDefaults() {
+    const now = new Date();
+    const quoteNum = 'QT-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+
+    document.getElementById('quoteNumber').value = quoteNum;
+    document.getElementById('quoteDate').value = now.toISOString().split('T')[0];
+
+    const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    document.getElementById('validUntil').value = validUntil.toISOString().split('T')[0];
+}
+
+function addLineItem() {
+    const row = document.createElement('tr');
+    row.className = 'line-item-row';
+    row.innerHTML = `
+        <td>
+            <select class="product-select" onchange="updateLineItemTotal(this)">
+                <option value="">-- Select Product --</option>
+                ${products.map(p => `<option value="${p.id}" data-price="${p.basePrice}">${p.name} (R${p.basePrice})</option>`).join('')}
+            </select>
+        </td>
+        <td><input type="number" class="qty-input" value="1" min="1" onchange="updateLineItemTotal(this)"></td>
+        <td><input type="number" class="price-input" value="0" min="0" step="0.01" onchange="updateLineItemTotal(this)"></td>
+        <td><div class="line-total">R 0.00</div></td>
+        <td><button class="remove-btn" onclick="removeLineItem(this)">Remove</button></td>
+    `;
+    document.getElementById('lineItemsBody').appendChild(row);
+}
+
+function updateLineItemTotal(el) {
+    const row = el.closest('tr');
+    const select = row.querySelector('.product-select');
+    const qtyInput = row.querySelector('.qty-input');
+    const priceInput = row.querySelector('.price-input');
+    const totalDiv = row.querySelector('.line-total');
+
+    if (select.value && !priceInput.value) {
+        const selected = products.find(p => p.id == select.value);
+        if (selected) {
+            priceInput.value = selected.basePrice;
+        }
+    }
+
+    const qty = parseFloat(qtyInput.value) || 0;
+    const price = parseFloat(priceInput.value) || 0;
+    const total = qty * price;
+
+    totalDiv.textContent = 'R ' + total.toFixed(2);
+    calculateTotals();
+}
+
+function removeLineItem(btn) {
+    btn.closest('tr').remove();
+    calculateTotals();
+}
+
+function calculateTotals() {
+    let subtotal = 0;
+    document.querySelectorAll('.line-item-row').forEach(row => {
+        const totalText = row.querySelector('.line-total').textContent;
+        const amount = parseFloat(totalText.replace('R ', '')) || 0;
+        subtotal += amount;
+    });
+
+    document.getElementById('subtotalDisplay').textContent = 'R ' + subtotal.toFixed(2);
+    document.getElementById('totalDisplay').textContent = 'R ' + subtotal.toFixed(2);
+}
+
+function submitQuote() {
+    const custName = document.getElementById('custName').value;
+    const custEmail = document.getElementById('custEmail').value;
+    const custPhone = document.getElementById('custPhone').value;
+
+    if (!custName || !custEmail || !custPhone) {
+        showMessage('Please fill in all customer details', 'error');
+        return;
+    }
+
+    const rows = document.querySelectorAll('.line-item-row');
+    if (rows.length === 0) {
+        showMessage('Please add at least one line item', 'error');
+        return;
+    }
+
+    const items = [];
+    let hasItem = false;
+    rows.forEach(row => {
+        const select = row.querySelector('.product-select');
+        if (select.value) {
+            items.push({
+                productId: select.value,
+                productName: select.options[select.selectedIndex].text,
+                qty: row.querySelector('.qty-input').value,
+                price: row.querySelector('.price-input').value
+            });
+            hasItem = true;
+        }
+    });
+
+    if (!hasItem) {
+        showMessage('Please select at least one product', 'error');
+        return;
+    }
+
+    const quote = {
+        id: document.getElementById('quoteNumber').value,
+        custName,
+        custEmail,
+        custPhone,
+        custCompany: document.getElementById('custCompany').value,
+        items,
+        total: document.getElementById('totalDisplay').textContent.replace('R ', ''),
+        notes: document.getElementById('quoteNotes').value,
+        validUntil: document.getElementById('validUntil').value,
+        createdAt: new Date().toLocaleString()
+    };
+
+    // Save to localStorage
+    const quotes = JSON.parse(localStorage.getItem('quotes') || '[]');
+    quotes.push(quote);
+    localStorage.setItem('quotes', JSON.stringify(quotes));
+
+    showMessage('✅ Quote submitted and saved! Reference: ' + quote.id, 'success');
+
+    setTimeout(() => {
+        window.location.href = 'admin.html';
+    }, 2000);
+}
+
+function resetForm() {
+    document.getElementById('custName').value = '';
+    document.getElementById('custEmail').value = '';
+    document.getElementById('custPhone').value = '';
+    document.getElementById('custCompany').value = '';
+    document.getElementById('quoteNotes').value = '';
+    document.getElementById('lineItemsBody').innerHTML = '';
+    addLineItem();
+    setQuoteDefaults();
+    calculateTotals();
+}
+
+function showMessage(text, type) {
+    const box = document.getElementById('msgBox');
+    box.textContent = text;
+    box.className = 'message ' + type;
+    setTimeout(() => { box.className = 'message'; }, 3000);
+}
+</script>
+
+</body>
+</html>
