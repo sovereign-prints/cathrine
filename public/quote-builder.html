@@ -18,7 +18,6 @@
             --light: #f5f7fa;
             --border: #e0e0e0;
             --success: #27ae60;
-            --danger: #e74c3c;
         }
 
         html, body {
@@ -141,7 +140,7 @@
 
         .item-row {
             display: grid;
-            grid-template-columns: 1fr auto auto;
+            grid-template-columns: 1fr auto auto auto;
             gap: 8px;
             padding: 12px;
             border-bottom: 1px solid var(--border);
@@ -158,6 +157,14 @@
             color: var(--dark);
         }
 
+        .item-qty {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark);
+            min-width: 40px;
+        }
+
         .item-price {
             text-align: right;
             font-size: 13px;
@@ -169,7 +176,7 @@
         .item-delete {
             background: transparent;
             border: none;
-            color: var(--danger);
+            color: #e74c3c;
             font-size: 18px;
             padding: 4px 8px;
             cursor: pointer;
@@ -250,10 +257,12 @@
             border-top: 1px solid var(--border);
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         button {
             flex: 1;
+            min-width: 120px;
             padding: 14px;
             border: none;
             border-radius: 8px;
@@ -282,6 +291,15 @@
 
         .btn-secondary:active {
             background: var(--light);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #229954 100%);
+            color: white;
+        }
+
+        .btn-success:active {
+            transform: scale(0.98);
         }
 
         /* Currency Input */
@@ -373,36 +391,21 @@
             border: 1px solid #f5c6cb;
         }
 
-        /* Quote Info */
-        .quote-meta {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            font-size: 13px;
-        }
-
-        .quote-meta-item {
-            background: var(--light);
-            padding: 12px;
-            border-radius: 8px;
-        }
-
-        .quote-meta-label {
-            font-size: 11px;
-            color: #999;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .quote-meta-value {
-            font-weight: 600;
-            color: var(--dark);
-        }
-
         /* Print Styles */
         @media print {
-            .header, .footer, .add-button, button:not(.print-button) {
+            .header, .footer, .add-button, .close-modal {
                 display: none;
+            }
+
+            .content {
+                padding: 0;
+            }
+
+            .section {
+                border: none;
+                padding: 0;
+                margin-bottom: 12px;
+                page-break-inside: avoid;
             }
 
             body {
@@ -413,16 +416,9 @@
                 max-width: 100%;
                 min-height: auto;
             }
-        }
 
-        /* Responsive */
-        @media (max-width: 380px) {
-            .header h1 {
-                font-size: 20px;
-            }
-
-            .quote-meta {
-                grid-template-columns: 1fr;
+            .item-row {
+                page-break-inside: avoid;
             }
         }
     </style>
@@ -439,27 +435,6 @@
         <div class="content">
             <!-- Messages -->
             <div id="message" class="message" style="display: none;"></div>
-
-            <!-- Quote Basics -->
-            <div class="section">
-                <div class="section-title">📋 Quote Details</div>
-
-                <div class="quote-meta">
-                    <div class="quote-meta-item">
-                        <div class="quote-meta-label">Quote #</div>
-                        <div class="quote-meta-value" id="quoteNumber">QT-20260824-001</div>
-                    </div>
-                    <div class="quote-meta-item">
-                        <div class="quote-meta-label">Date</div>
-                        <div class="quote-meta-value" id="quoteDate">24 Aug 2026</div>
-                    </div>
-                </div>
-
-                <div class="form-group" style="margin-top: 12px;">
-                    <label>Valid Until</label>
-                    <input type="date" id="validUntil">
-                </div>
-            </div>
 
             <!-- Client Info -->
             <div class="section">
@@ -496,8 +471,9 @@
                             <div class="item-description"><strong>T-Shirt Branding (100 units)</strong></div>
                             <div style="font-size: 12px; color: #999;">Single color chest print</div>
                         </div>
+                        <div class="item-qty">1</div>
                         <div class="item-price">R1,250</div>
-                        <button class="item-delete" onclick="deleteItem(0)">✕</button>
+                        <button class="item-delete" onclick="deleteItem(this)">✕</button>
                     </div>
 
                     <div class="item-row">
@@ -505,8 +481,9 @@
                             <div class="item-description"><strong>Design & Setup</strong></div>
                             <div style="font-size: 12px; color: #999;">Logo adaptation</div>
                         </div>
+                        <div class="item-qty">1</div>
                         <div class="item-price">R300</div>
-                        <button class="item-delete" onclick="deleteItem(1)">✕</button>
+                        <button class="item-delete" onclick="deleteItem(this)">✕</button>
                     </div>
 
                     <div class="item-row">
@@ -514,38 +491,32 @@
                             <div class="item-description"><strong>Delivery</strong></div>
                             <div style="font-size: 12px; color: #999;">Courier included</div>
                         </div>
+                        <div class="item-qty">1</div>
                         <div class="item-price">R150</div>
-                        <button class="item-delete" onclick="deleteItem(2)">✕</button>
+                        <button class="item-delete" onclick="deleteItem(this)">✕</button>
                     </div>
                 </div>
 
                 <button class="add-button" onclick="openAddItemModal()">+ Add Item</button>
             </div>
 
-            <!-- Calculation Section -->
+            <!-- Totals -->
+            <div class="totals-card">
+                <div class="total-row grand-total">
+                    <span>Total Due:</span>
+                    <span id="totalDue">R1,700</span>
+                </div>
+            </div>
+
+            <!-- Bank Details -->
             <div class="section">
-                <div class="section-title">💰 Calculations</div>
+                <div class="section-title">🏦 Bank Details</div>
 
-                <div class="form-group">
-                    <label>Subtotal (Auto)</label>
-                    <input type="text" id="subtotal" value="R1,700" readonly style="background: var(--light);">
-                </div>
-
-                <div class="form-group">
-                    <label>VAT % (15%)</label>
-                    <input type="number" id="vatRate" value="15" min="0" max="100" step="0.5">
-                </div>
-
-                <div class="form-group">
-                    <label>VAT Amount (Auto)</label>
-                    <input type="text" id="vatAmount" value="R255" readonly style="background: var(--light);">
-                </div>
-
-                <div class="form-group">
-                    <label>Additional Discount (Optional)</label>
-                    <div class="currency-input">
-                        <input type="number" id="discount" placeholder="0" min="0" step="10">
-                    </div>
+                <div class="client-card">
+                    <strong>Sovereign Prints</strong>
+                    <p><strong>Bank:</strong> FNB</p>
+                    <p><strong>Account:</strong> 62379192637</p>
+                    <p><strong>Account Holder:</strong> Cathrine Nel</p>
                 </div>
             </div>
 
@@ -565,49 +536,13 @@ Payment via bank transfer</textarea>
                     <textarea id="additionalNotes" placeholder="Any special requests or terms..."></textarea>
                 </div>
             </div>
-
-            <!-- Bank Details -->
-            <div class="section">
-                <div class="section-title">🏦 Bank Details</div>
-
-                <div class="client-card">
-                    <strong>Sovereign Prints</strong>
-                    <p><strong>Bank:</strong> FNB</p>
-                    <p><strong>Account:</strong> 62379192637</p>
-                    <p><strong>Account Holder:</strong> Cathrine Nel</p>
-                </div>
-
-                <div class="form-group">
-                    <label>Reference (for payment)</label>
-                    <input type="text" id="reference" placeholder="e.g., QT-20260824-001">
-                </div>
-            </div>
-
-            <!-- Totals -->
-            <div class="totals-card">
-                <div class="total-row">
-                    <span>Subtotal:</span>
-                    <span id="totalSubtotal">R1,700</span>
-                </div>
-                <div class="total-row">
-                    <span>VAT (<span id="vatLabel">15</span>%):</span>
-                    <span id="totalVat">R255</span>
-                </div>
-                <div class="total-row" id="discountRow" style="display: none;">
-                    <span>Discount:</span>
-                    <span id="totalDiscount">-R0</span>
-                </div>
-                <div class="total-row grand-total">
-                    <span>Total Due:</span>
-                    <span id="totalDue">R1,955</span>
-                </div>
-            </div>
         </div>
 
         <!-- Footer / Actions -->
         <div class="footer">
             <button class="btn-secondary" onclick="resetForm()">Clear</button>
-            <button class="btn-primary" onclick="printQuote()">Print Quote</button>
+            <button class="btn-primary" onclick="printQuote()">📄 Print Quote</button>
+            <button class="btn-success" onclick="submitToProjects()">✓ Submit to Projects</button>
         </div>
     </div>
 
@@ -630,6 +565,11 @@ Payment via bank transfer</textarea>
             </div>
 
             <div class="form-group">
+                <label>Quantity</label>
+                <input type="number" id="newItemQty" placeholder="1" min="1" value="1">
+            </div>
+
+            <div class="form-group">
                 <label>Price</label>
                 <div class="currency-input">
                     <input type="number" id="newItemPrice" placeholder="0" min="0" step="50">
@@ -643,37 +583,14 @@ Payment via bank transfer</textarea>
     <script>
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            updateQuoteDate();
             calculateTotals();
-            updateReference();
         });
-
-        // Set quote date and valid until
-        function updateQuoteDate() {
-            const today = new Date();
-            const dd = String(today.getDate()).padStart(2, '0');
-            const mm = today.toLocaleDateString('en-US', { month: 'short' });
-            const yyyy = today.getFullYear();
-
-            document.getElementById('quoteDate').textContent = `${dd} ${mm} ${yyyy}`;
-
-            const future = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-            document.getElementById('validUntil').valueAsDate = future;
-        }
-
-        // Update reference automatically
-        function updateReference() {
-            const today = new Date();
-            const dateStr = today.getFullYear().toString() +
-                          String(today.getMonth() + 1).padStart(2, '0') +
-                          String(today.getDate()).padStart(2, '0');
-            document.getElementById('reference').value = `QT-${dateStr}-001`;
-        }
 
         // Add item
         function addItem() {
             const desc = document.getElementById('newItemDesc').value;
             const details = document.getElementById('newItemDetails').value;
+            const qty = parseInt(document.getElementById('newItemQty').value) || 1;
             const price = parseFloat(document.getElementById('newItemPrice').value) || 0;
 
             if (!desc) {
@@ -690,6 +607,7 @@ Payment via bank transfer</textarea>
                         <div class="item-description"><strong>${desc}</strong></div>
                         ${details ? `<div style="font-size: 12px; color: #999;">${details}</div>` : ''}
                     </div>
+                    <div class="item-qty">${qty}</div>
                     <div class="item-price">${priceFormatted}</div>
                     <button class="item-delete" onclick="deleteItem(this)">✕</button>
                 </div>
@@ -702,17 +620,13 @@ Payment via bank transfer</textarea>
             // Clear modal
             document.getElementById('newItemDesc').value = '';
             document.getElementById('newItemDetails').value = '';
+            document.getElementById('newItemQty').value = '1';
             document.getElementById('newItemPrice').value = '';
         }
 
         // Delete item
-        function deleteItem(index) {
-            if (typeof index === 'number') {
-                const items = document.querySelectorAll('.item-row');
-                items[index].remove();
-            } else {
-                index.closest('.item-row').remove();
-            }
+        function deleteItem(button) {
+            button.closest('.item-row').remove();
             calculateTotals();
         }
 
@@ -721,27 +635,10 @@ Payment via bank transfer</textarea>
             const itemPrices = Array.from(document.querySelectorAll('.item-price'))
                 .map(el => parseFloat(el.textContent.replace('R', '').replace(',', '')) || 0);
 
-            const subtotal = itemPrices.reduce((a, b) => a + b, 0);
-            const vatRate = parseFloat(document.getElementById('vatRate').value) || 15;
-            const vat = (subtotal * vatRate) / 100;
-            const discount = parseFloat(document.getElementById('discount').value) || 0;
-            const total = subtotal + vat - discount;
+            const total = itemPrices.reduce((a, b) => a + b, 0);
 
-            // Update displays
-            document.getElementById('subtotal').value = 'R' + subtotal.toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            document.getElementById('vatAmount').value = 'R' + Math.round(vat).toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            document.getElementById('totalSubtotal').textContent = 'R' + subtotal.toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            document.getElementById('totalVat').textContent = 'R' + Math.round(vat).toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            document.getElementById('totalDue').textContent = 'R' + Math.round(total).toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            document.getElementById('vatLabel').textContent = Math.round(vatRate);
-
-            // Show/hide discount row
-            if (discount > 0) {
-                document.getElementById('discountRow').style.display = 'flex';
-                document.getElementById('totalDiscount').textContent = '-R' + discount.toLocaleString('en-ZA', {minimumFractionDigits: 0});
-            } else {
-                document.getElementById('discountRow').style.display = 'none';
-            }
+            // Update display
+            document.getElementById('totalDue').textContent = 'R' + total.toLocaleString('en-ZA', {minimumFractionDigits: 0});
         }
 
         // Modal functions
@@ -759,16 +656,57 @@ Payment via bank transfer</textarea>
             window.print();
         }
 
+        // Submit to Projects
+        function submitToProjects() {
+            const clientName = document.getElementById('clientName').value;
+            if (!clientName) {
+                alert('Please enter client name');
+                return;
+            }
+
+            const items = Array.from(document.querySelectorAll('.item-row')).map(row => ({
+                description: row.querySelector('.item-description strong').textContent,
+                qty: row.querySelector('.item-qty').textContent,
+                price: row.querySelector('.item-price').textContent
+            }));
+
+            const total = document.getElementById('totalDue').textContent;
+
+            const quoteData = {
+                client: clientName,
+                company: document.getElementById('companyName').value,
+                email: document.getElementById('clientEmail').value,
+                phone: document.getElementById('clientPhone').value,
+                items: items,
+                total: total,
+                paymentTerms: document.getElementById('paymentTerms').value,
+                notes: document.getElementById('additionalNotes').value,
+                timestamp: new Date().toLocaleString()
+            };
+
+            // Save to localStorage
+            const quotes = JSON.parse(localStorage.getItem('sovereignQuotes') || '[]');
+            quotes.push(quoteData);
+            localStorage.setItem('sovereignQuotes', JSON.stringify(quotes));
+
+            // Show success message
+            const msg = document.getElementById('message');
+            msg.className = 'message success';
+            msg.textContent = `✓ Quote for ${clientName} submitted to projects!`;
+            msg.style.display = 'block';
+
+            // Reset after 3 seconds
+            setTimeout(() => {
+                resetForm();
+            }, 2000);
+        }
+
         // Reset form
         function resetForm() {
             if (confirm('Are you sure you want to clear all data?')) {
                 location.reload();
             }
         }
-
-        // Event listeners for calculations
-        document.getElementById('vatRate').addEventListener('change', calculateTotals);
-        document.getElementById('discount').addEventListener('input', calculateTotals);
     </script>
 </body>
 </html>
