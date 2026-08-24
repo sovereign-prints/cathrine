@@ -359,6 +359,9 @@ function adminAuth(req, res, next) {
   }
 }
 
+// Alias for consistency with project routes
+const authenticateAdmin = adminAuth;
+
 // Get admin dashboard stats
 app.get('/api/admin/dashboard', adminAuth, (req, res) => {
   try {
