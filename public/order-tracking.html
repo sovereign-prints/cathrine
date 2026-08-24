@@ -455,7 +455,7 @@
 
                 <div class="buttons">
                     <button type="button" class="btn btn-primary" onclick="saveQuote()">💾 Save Quote</button>
-                    <button type="button" class="btn btn-info" onclick="downloadQuoteJSON()">📥 Export Quote</button>
+                    <button type="button" class="btn btn-info" onclick="printQuote()">🖨️ Print Quote (PDF)</button>
                     <button type="reset" class="btn btn-secondary">Clear</button>
                 </div>
             </form>
@@ -748,6 +748,17 @@ function saveQuote() {
 
 function convertToOrder(quoteIdx) {
     const quote = quotes[quoteIdx];
+    if (!quote) return;
+
+    // Switch to the Orders tab so the form is actually visible
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('orders').classList.add('active');
+    document.querySelector('.tab-btn[onclick*="orders"]').classList.add('active');
+
+    // Pre-select this quote in the dropdown
+    document.getElementById('quoteSelect').value = quoteIdx;
+
     document.getElementById('orderForm').style.display = 'block';
     document.getElementById('orderID').value = 'ORD-' + Date.now();
 
@@ -765,12 +776,25 @@ function loadQuoteForOrder() {
         document.getElementById('orderForm').style.display = 'none';
         return;
     }
-    convertToOrder(idx);
+
+    const quote = quotes[idx];
+    document.getElementById('orderForm').style.display = 'block';
+    document.getElementById('orderID').value = 'ORD-' + Date.now();
+
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() + 7);
+    document.getElementById('orderDeadline').value = deadline.toISOString().split('T')[0];
+
+    document.getElementById('orderForm').dataset.quoteIdx = idx;
 }
 
 function saveOrder() {
     const quoteIdx = document.getElementById('orderForm').dataset.quoteIdx;
     const quote = quotes[quoteIdx];
+    if (!quote) {
+        showMessage('Could not find the original quote. Please reselect it.', 'error');
+        return;
+    }
 
     const order = {
         orderID: document.getElementById('orderID').value,
@@ -781,15 +805,24 @@ function saveOrder() {
         notes: document.getElementById('orderNotes').value,
         total: quote.total,
         items: quote.items,
+        quoteRef: quote.id,
         createdAt: new Date().toLocaleString()
     };
 
     orders.push(order);
+
+    // Remove the converted quote from the Quotes list so it doesn't sit there duplicated
+    quotes.splice(quoteIdx, 1);
+
     saveData();
     document.getElementById('orderForm').style.display = 'none';
+    document.getElementById('orderForm').removeAttribute('data-quote-idx');
+    delete document.getElementById('orderForm').dataset.quoteIdx;
     document.getElementById('quoteSelect').value = '';
-    showMessage('✅ Order created successfully!', 'success');
+    showMessage('✅ Order created successfully! Quote moved to Orders.', 'success');
+    displayQuotes();
     displayOrders();
+    populateQuoteSelect();
 }
 
 function cancelOrder() {
@@ -825,19 +858,114 @@ function downloadOrdersJSON() {
     downloadJSON({ orders }, 'orders');
 }
 
-function downloadQuoteJSON() {
+function printQuote() {
+    const custName = document.getElementById('quoteCustName').value;
+    if (!custName) {
+        showMessage('Please enter customer name before printing', 'error');
+        return;
+    }
+
     const total = calculateQuoteTotal();
-    const quote = {
-        type: 'QUOTE',
-        customer: document.getElementById('quoteCustName').value,
-        email: document.getElementById('quoteCustEmail').value,
-        phone: document.getElementById('quoteCustPhone').value,
-        service: document.getElementById('quoteService').value,
-        description: document.getElementById('quoteDesc').value,
-        total: total,
-        createdAt: new Date().toLocaleString()
-    };
-    downloadJSON(quote, 'quote-' + Date.now());
+    const subtotal = document.getElementById('subtotal').textContent;
+    const tax = document.getElementById('tax').textContent;
+    const validDays = document.getElementById('quoteValidDays').value;
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + parseInt(validDays || 7));
+
+    const items = Array.from(document.querySelectorAll('.line-item')).map(item => ({
+        name: item.querySelector('.item-name').value || '-',
+        qty: item.querySelector('.item-qty').value || '0',
+        price: item.querySelector('.item-price').value || '0',
+        subtotal: item.querySelector('.item-subtotal').value || 'R 0.00'
+    }));
+
+    const custEmail = document.getElementById('quoteCustEmail').value;
+    const custPhone = document.getElementById('quoteCustPhone').value;
+    const service = document.getElementById('quoteService').value;
+    const desc = document.getElementById('quoteDesc').value;
+    const notes = document.getElementById('quoteNotes').value;
+
+    const rowsHtml = items.map(it => `
+        <tr>
+            <td style="padding:10px;border-bottom:1px solid #eee;">${it.name}</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.qty}</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">R ${parseFloat(it.price).toFixed(2)}</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${it.subtotal}</td>
+        </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Quote - ${custName}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; padding: 40px; color: #1f2937; }
+                .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
+                .header h1 { color: #6366f1; font-size: 28px; }
+                .header p { color: #6b7280; font-size: 13px; margin-top: 4px; }
+                .meta { text-align: right; font-size: 13px; color: #6b7280; }
+                .section { margin-bottom: 24px; }
+                .section h3 { font-size: 14px; text-transform: uppercase; color: #6b7280; margin-bottom: 8px; letter-spacing: 0.5px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th { text-align: left; padding: 10px; background: #f3f4f6; font-size: 13px; }
+                th:nth-child(2) { text-align: center; }
+                th:nth-child(3), th:nth-child(4) { text-align: right; }
+                .totals { margin-top: 20px; margin-left: auto; width: 280px; }
+                .totals div { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+                .totals .total-row { border-top: 2px solid #6366f1; font-weight: 700; font-size: 16px; margin-top: 6px; padding-top: 10px; }
+                .notes { margin-top: 30px; font-size: 13px; color: #6b7280; }
+                @media print { body { padding: 20px; } }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <h1>SOVEREIGN PRINTS</h1>
+                    <p>Custom Printing & Branding Solutions</p>
+                </div>
+                <div class="meta">
+                    <div><strong>QUOTE</strong></div>
+                    <div>Date: ${new Date().toLocaleDateString()}</div>
+                    <div>Valid until: ${validUntil.toLocaleDateString()}</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Client</h3>
+                <div>${custName}</div>
+                ${custEmail ? `<div>${custEmail}</div>` : ''}
+                ${custPhone ? `<div>${custPhone}</div>` : ''}
+                ${service ? `<div>Service: ${service}</div>` : ''}
+                ${desc ? `<div style="margin-top:8px;">${desc}</div>` : ''}
+            </div>
+
+            <div class="section">
+                <h3>Items</h3>
+                <table>
+                    <thead>
+                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+
+                <div class="totals">
+                    <div><span>Subtotal:</span><span>${subtotal}</span></div>
+                    <div><span>Tax (15%):</span><span>${tax}</span></div>
+                    <div class="total-row"><span>TOTAL:</span><span>R ${total.toFixed(2)}</span></div>
+                </div>
+            </div>
+
+            ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ''}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
 }
 
 function downloadJSON(data, filename) {
