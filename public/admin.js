@@ -742,9 +742,14 @@ function uploadGalleryImage(event) {
 function setupProjectsTab() {
   const form = document.getElementById('newProjectForm');
   if (form) {
-    form.addEventListener('submit', handleAddProject);
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('dueDate').min = today;
+    form.addEventListener('submit', function(e) {
+      handleAddProject(e);
+    });
+    const dueDate = document.getElementById('dueDate');
+    if (dueDate) {
+      const today = new Date().toISOString().split('T')[0];
+      dueDate.min = today;
+    }
   }
   loadProjects();
 }
@@ -803,6 +808,9 @@ function displayProjects(projects) {
 async function handleAddProject(e) {
   e.preventDefault();
 
+  const form = document.getElementById('newProjectForm');
+  const editingId = form.dataset.editingId;
+
   const project = {
     projectName: document.getElementById('projectName').value,
     customerName: document.getElementById('customerName').value,
@@ -817,26 +825,50 @@ async function handleAddProject(e) {
   };
 
   try {
-    const response = await fetch(`${API_BASE}/admin/projects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify(project)
-    });
+    // If editing, use PATCH; if creating, use POST
+    if (editingId) {
+      const response = await fetch(`${API_BASE}/admin/projects/${editingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(project)
+      });
 
-    const result = await response.json();
-    if (result.success) {
-      alert(`✅ ${result.message}`);
-      document.getElementById('newProjectForm').reset();
-      loadProjects();
+      const result = await response.json();
+      if (result.success) {
+        alert('✅ Project updated successfully!');
+        form.reset();
+        form.dataset.editingId = null;
+        const btn = form.querySelector('button[type="submit"]');
+        btn.textContent = '💾 Save Project';
+        loadProjects();
+      } else {
+        alert(`❌ ${result.error}`);
+      }
     } else {
-      alert(`❌ ${result.error}`);
+      const response = await fetch(`${API_BASE}/admin/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(project)
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(`✅ ${result.message}`);
+        form.reset();
+        loadProjects();
+      } else {
+        alert(`❌ ${result.error}`);
+      }
     }
   } catch (error) {
-    console.error('Error creating project:', error);
-    alert('❌ Failed to create project');
+    console.error('Error with project:', error);
+    alert('❌ Failed to save project');
   }
 }
 
@@ -859,12 +891,16 @@ function editProject(projectId) {
     document.getElementById('notes').value = p.notes;
 
     const form = document.getElementById('newProjectForm');
+    form.dataset.editingId = projectId;
     const btn = form.querySelector('button[type="submit"]');
     btn.textContent = '✅ Update Project';
-    btn.onclick = (e) => updateProject(e, projectId);
 
     document.querySelector('button[data-tab="projects"]').click();
     document.getElementById('projectName').focus();
+  })
+  .catch(error => {
+    console.error('Error loading project:', error);
+    alert('❌ Failed to load project');
   });
 }
 
