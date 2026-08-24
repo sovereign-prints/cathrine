@@ -644,11 +644,11 @@
     <aside class="admin-sidebar">
       <ul class="sidebar-nav">
         <a href="#" data-tab="dashboard" class="sidebar-link active">📊 Dashboard</a>
-        <a href="#" data-tab="new-quote" class="sidebar-link">✍️ New Quote</a>
-        <a href="#" data-tab="projects" class="sidebar-link">📋 Projects</a>
         <a href="#" data-tab="products" class="sidebar-link">📦 Products</a>
         <a href="#" data-tab="gallery" class="sidebar-link">🖼️ Gallery</a>
         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
+        <a href="quote-builder.html" class="sidebar-link">💬 Quote Builder</a>
+        <a href="order-tracking.html" class="sidebar-link">📋 Order Tracking</a>
         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
       </ul>
     </aside>
@@ -702,123 +702,6 @@
       </div>
 
       <!-- NEW QUOTE TAB -->
-      <div id="new-quote" class="tab-content">
-        <div class="section">
-          <h2>Incoming Quote Requests</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Reference</th>
-                <th>Customer</th>
-                <th>Email</th>
-                <th>Service</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="quotesTable">
-              <tr>
-                <td colspan="7" style="text-align: center; padding: 40px 12px; color: var(--text-light);">
-                  No incoming quote requests. Customers will submit quotes here.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- PROJECTS TAB -->
-      <div id="projects" class="tab-content">
-        <div class="section">
-          <h2>Create New Project</h2>
-          <form id="projectForm" onsubmit="handleAddProject(event)">
-            <div class="form-row">
-              <div class="form-group">
-                <label>Project Name *</label>
-                <input type="text" id="projectName" placeholder="e.g., Business Cards - Acme Corp" required>
-              </div>
-              <div class="form-group">
-                <label>Customer Name *</label>
-                <input type="text" id="projectCustomer" placeholder="John Smith" required>
-              </div>
-              <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="projectEmail" placeholder="john@example.com">
-              </div>
-              <div class="form-group">
-                <label>Phone</label>
-                <input type="tel" id="projectPhone" placeholder="555-1234">
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>Service Type *</label>
-                <select id="projectService" required>
-                  <option value="">— Select service —</option>
-                  <option value="Printing">Printing</option>
-                  <option value="Clothing">Clothing</option>
-                  <option value="Signage">Signage</option>
-                  <option value="Vehicle Branding">Vehicle Branding</option>
-                  <option value="Custom">Custom</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Status *</label>
-                <select id="projectStatus" required>
-                  <option value="in-progress">IN PROGRESS</option>
-                  <option value="complete">COMPLETE</option>
-                  <option value="on-hold">ON HOLD</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Quoted Price</label>
-                <input type="text" id="projectPrice" placeholder="R 450">
-              </div>
-              <div class="form-group">
-                <label>Due Date</label>
-                <input type="date" id="projectDueDate">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Description</label>
-              <textarea id="projectDescription" placeholder="Project details..."></textarea>
-            </div>
-
-            <div class="btn-group">
-              <button type="submit" class="btn btn-primary">Save Project</button>
-              <button type="reset" class="btn btn-secondary">Clear</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="section">
-          <h2>Active Projects</h2>
-          <table id="projectsTable">
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Customer</th>
-                <th>Service</th>
-                <th>Status</th>
-                <th>Price</th>
-                <th>Due Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colspan="7" style="text-align: center; padding: 40px 12px; color: var(--text-light);">
-                  No projects yet. Create one above or approve a quote to start.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- PRODUCTS TAB -->
       <div id="products" class="tab-content">
         <div class="section">
