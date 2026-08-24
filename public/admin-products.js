@@ -563,8 +563,12 @@ async function saveProductImage(event, productId) {
   formData.append('image', fileInput.files[0]);
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${productId}/image`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
