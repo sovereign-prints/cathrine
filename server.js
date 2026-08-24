@@ -42,6 +42,7 @@ const productsFile = path.join(dataDir, 'products.json');
 const quotesFile = path.join(dataDir, 'quotes.json');
 const galleryFile = path.join(dataDir, 'gallery.json');
 const templatesFile = path.join(dataDir, 'templates.json');
+const projectsFile = path.join(dataDir, 'projects.json');
 
 // Initialize data files
 function initializeData() {
@@ -877,8 +878,6 @@ app.get('/api/gallery', (req, res) => {
 });
 
 // ============ PROJECT TRACKING ENDPOINTS ============
-
-const projectsFile = path.join(dataDir, 'projects.json');
 
 // Initialize projects data
 function initializeProjectsData() {
