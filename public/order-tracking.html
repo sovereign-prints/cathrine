@@ -963,8 +963,20 @@ function printQuote() {
                     font-size: 40px;
                     color: #ec4899;
                 }
+                html, body {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    color-adjust: exact;
+                }
                 @media print {
-                    body { background: #0a0a12; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 24px; }
+                    @page { background: #0a0a12; margin: 0; }
+                    html, body {
+                        background: #0a0a12 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                        padding: 24px;
+                    }
                 }
             </style>
         </head>
@@ -986,7 +998,6 @@ function printQuote() {
                     <div class="client-name">${custName}</div>
                     ${custEmail ? `<div style="color:#a3a7c2;font-size:13px;">${custEmail}</div>` : ''}
                     ${custPhone ? `<div style="color:#a3a7c2;font-size:13px;">${custPhone}</div>` : ''}
-                    ${service ? `<div style="color:#a3a7c2;font-size:13px;margin-top:4px;">Service: ${service}</div>` : ''}
                     ${desc ? `<div style="margin-top:8px;font-size:13px;color:#eceef5;">${desc}</div>` : ''}
                 </div>
 
