@@ -1,6 +1,5 @@
 // ============ ADMIN PRODUCTS & GALLERY MANAGEMENT ============
 // Last updated: 2026-08-24 - Authorization headers added, duplicate variables removed
-
 // NOTE: Global variables (allProducts, allGalleryItems, editingProductId, editingGalleryId)
 // are already declared in admin.js - do not redeclare them here
 
