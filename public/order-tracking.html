@@ -368,87 +368,73 @@
         <div id="quotes" class="tab-content active">
             <div class="section-title">💬 Create Quote</div>
 
-            <form id="quoteForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="required">Customer Name</label>
-                        <input type="text" id="quoteCustName" placeholder="John Smith" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="quoteCustEmail" placeholder="john@company.com">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Phone</label>
-                        <input type="tel" id="quoteCustPhone" placeholder="555-1234">
-                    </div>
-                    <div class="form-group">
-                        <label class="required">Service Type</label>
-                        <select id="quoteService" required>
-                            <option value="">Select service</option>
-                            <option>Printing</option>
-                            <option>Clothing</option>
-                            <option>Signage</option>
-                            <option>Vehicle Branding</option>
-                            <option>Custom</option>
-                        </select>
-                    </div>
-                </div>
-
+            <!-- Client Info -->
+            <div class="form-row">
                 <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="quoteDesc" placeholder="Project details and requirements"></textarea>
+                    <label class="required">Client Name</label>
+                    <input type="text" id="quoteCustName" placeholder="Enter client name" required>
                 </div>
-
-                <div class="section-title" style="margin-top: 30px;">Line Items</div>
-
-                <div id="lineItemsContainer">
-                    <div class="line-item">
-                        <input type="text" placeholder="Product/Service" class="item-name">
-                        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1">
-                        <input type="number" placeholder="Unit Price" class="item-price" value="0" min="0" step="0.01">
-                        <input type="text" placeholder="Subtotal" class="item-subtotal" readonly disabled>
-                        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px;">Remove</button>
-                    </div>
+                <div class="form-group">
+                    <label>Company</label>
+                    <input type="text" id="quoteCompany" placeholder="Optional">
                 </div>
+            </div>
 
-                <button type="button" class="btn btn-info" onclick="addLineItem()" style="margin-top: 10px;">+ Add Item</button>
-
-                <div class="quote-total">
-                    <div class="quote-total-row">
-                        <div>Subtotal:</div>
-                        <div id="subtotal">R 0.00</div>
-                    </div>
-                    <div class="quote-total-row">
-                        <div>Tax (15%):</div>
-                        <div id="tax">R 0.00</div>
-                    </div>
-                    <div class="quote-total-row total">
-                        <div>TOTAL:</div>
-                        <div id="quoteTotal">R 0.00</div>
-                    </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="quoteCustEmail" placeholder="client@example.com">
                 </div>
-
-                <div class="form-row" style="margin-top: 20px;">
-                    <div class="form-group">
-                        <label>Valid Until (Days)</label>
-                        <input type="number" id="quoteValidDays" value="7" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Notes</label>
-                        <textarea id="quoteNotes" placeholder="Additional notes or terms"></textarea>
-                    </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" id="quoteCustPhone" placeholder="+27 (0) 11 XXXX XXXX">
                 </div>
+            </div>
 
-                <div class="buttons">
-                    <button type="button" class="btn btn-primary" onclick="saveQuote()">💾 Save Quote</button>
-                    <button type="button" class="btn btn-info" onclick="downloadQuoteJSON()">📥 Export Quote</button>
-                    <button type="reset" class="btn btn-secondary">Clear</button>
+            <!-- Line Items -->
+            <div class="section-title" style="margin-top: 30px;">📦 Items</div>
+
+            <div id="lineItemsContainer" style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+                <div class="line-item" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; padding: 12px; border-bottom: 1px solid #e0e0e0; align-items: center; background: white;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px;">Product/Service</div>
+                        <div style="font-size: 12px; color: #999;">Description</div>
+                    </div>
+                    <input type="number" placeholder="Qty" class="item-qty" value="1" min="1" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                    <div class="currency-input" style="position: relative;">
+                        <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-weight: 600;">R</span>
+                        <input type="number" placeholder="0" class="item-price" value="0" min="0" step="50" style="padding: 8px 8px 8px 24px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px; background: white; border: 1px solid #e0e0e0; color: #e74c3c; cursor: pointer; border-radius: 6px;">✕</button>
                 </div>
-            </form>
+            </div>
+
+            <button type="button" class="btn btn-info" onclick="addLineItem()" style="margin-top: 12px; width: 100%; padding: 12px; background: #f5f7fa; border: 2px dashed #e0e0e0; color: #667eea; font-weight: 600; border-radius: 8px; cursor: pointer;">+ Add Item</button>
+
+            <!-- Total -->
+            <div class="quote-total" style="margin-top: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px; border-radius: 8px;">
+                <div class="quote-total-row" style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 700;">
+                    <div>Total Due:</div>
+                    <div id="quoteTotal">R 0</div>
+                </div>
+            </div>
+
+            <!-- Notes & Terms -->
+            <div class="form-row" style="margin-top: 20px;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Payment Terms</label>
+                    <textarea id="quoteNotes" placeholder="e.g., 50% deposit required, balance due before production" style="height: 80px;">50% deposit required
+Balance due before production
+Payment via bank transfer</textarea>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="buttons" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" onclick="resetQuoteForm()" style="flex: 1;">Clear</button>
+                <button type="button" class="btn btn-primary" onclick="printQuote()" style="flex: 1;">📄 Print Quote</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuote()" style="flex: 1; background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">✓ Submit Quote</button>
+            </div>
 
             <!-- Quotes List -->
             <div style="margin-top: 40px;">
@@ -657,46 +643,44 @@ function switchTab(e, tabName) {
 function addLineItem() {
     const container = document.getElementById('lineItemsContainer');
     const newItem = document.createElement('div');
+    newItem.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; padding: 12px; border-bottom: 1px solid #e0e0e0; align-items: center; background: white;';
     newItem.className = 'line-item';
     newItem.innerHTML = `
-        <input type="text" placeholder="Product/Service" class="item-name">
-        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1">
-        <input type="number" placeholder="Unit Price" class="item-price" value="0" min="0" step="0.01">
-        <input type="text" placeholder="Subtotal" class="item-subtotal" readonly disabled>
-        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px;">Remove</button>
+        <div>
+            <input type="text" placeholder="Product/Service" class="item-name" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-weight: 600;">
+            <input type="text" placeholder="Description" class="item-desc" style="width: 100%; padding: 6px; border: none; font-size: 12px; color: #999; margin-top: 4px;">
+        </div>
+        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; text-align: center;">
+        <div style="position: relative;">
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-weight: 600;">R</span>
+            <input type="number" placeholder="0" class="item-price" value="0" min="0" step="50" style="width: 100%; padding: 8px 8px 8px 24px; border: 1px solid #e0e0e0; border-radius: 6px;">
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px; background: white; border: 1px solid #e0e0e0; color: #e74c3c; cursor: pointer; border-radius: 6px;">✕</button>
     `;
     container.appendChild(newItem);
     attachLineItemListeners(newItem);
 }
 
 function removeLineItem(btn) {
-    btn.parentElement.remove();
+    btn.closest('.line-item').remove();
     calculateQuoteTotal();
 }
 
 function attachLineItemListeners(element) {
     const inputs = element.querySelectorAll('.item-qty, .item-price');
     inputs.forEach(input => input.addEventListener('change', calculateQuoteTotal));
+    inputs.forEach(input => input.addEventListener('input', calculateQuoteTotal));
 }
 
 function calculateQuoteTotal() {
-    let subtotal = 0;
+    let total = 0;
     document.querySelectorAll('.line-item').forEach(item => {
         const qty = parseFloat(item.querySelector('.item-qty').value) || 0;
         const price = parseFloat(item.querySelector('.item-price').value) || 0;
-        const itemTotal = qty * price;
-        item.querySelector('.item-subtotal').value = 'R ' + itemTotal.toFixed(2);
-        subtotal += itemTotal;
+        total += qty * price;
     });
 
-    const tax = subtotal * 0.15;
-    const total = subtotal + tax;
-
-    document.getElementById('subtotal').textContent = 'R ' + subtotal.toFixed(2);
-    document.getElementById('tax').textContent = 'R ' + tax.toFixed(2);
-    document.getElementById('quoteTotal').textContent = 'R ' + total.toFixed(2);
-
-    return total;
+    document.getElementById('quoteTotal').textContent = 'R ' + Math.round(total).toLocaleString('en-ZA', {minimumFractionDigits: 0});
 }
 
 function saveQuote() {
@@ -706,23 +690,17 @@ function saveQuote() {
         return;
     }
 
-    const total = calculateQuoteTotal();
-    const validDays = document.getElementById('quoteValidDays').value;
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + parseInt(validDays));
-
     const quote = {
         id: 'QT-' + Date.now(),
         custName: custName,
+        company: document.getElementById('quoteCompany').value,
         custEmail: document.getElementById('quoteCustEmail').value,
         custPhone: document.getElementById('quoteCustPhone').value,
-        service: document.getElementById('quoteService').value,
-        desc: document.getElementById('quoteDesc').value,
-        total: total,
-        validUntil: validUntil.toLocaleDateString(),
+        total: document.getElementById('quoteTotal').textContent,
         notes: document.getElementById('quoteNotes').value,
         items: Array.from(document.querySelectorAll('.line-item')).map(item => ({
             name: item.querySelector('.item-name').value,
+            desc: item.querySelector('.item-desc').value,
             qty: item.querySelector('.item-qty').value,
             price: item.querySelector('.item-price').value
         })),
@@ -731,9 +709,24 @@ function saveQuote() {
 
     quotes.push(quote);
     saveData();
-    document.getElementById('quoteForm').reset();
-    showMessage('✅ Quote saved successfully!', 'success');
+    resetQuoteForm();
+    showMessage('✅ Quote submitted to projects!', 'success');
     displayQuotes();
+}
+
+function printQuote() {
+    window.print();
+}
+
+function resetQuoteForm() {
+    document.getElementById('quoteCustName').value = '';
+    document.getElementById('quoteCompany').value = '';
+    document.getElementById('quoteCustEmail').value = '';
+    document.getElementById('quoteCustPhone').value = '';
+    document.getElementById('quoteNotes').value = '50% deposit required\nBalance due before production\nPayment via bank transfer';
+    document.getElementById('lineItemsContainer').innerHTML = '';
+    addLineItem();
+    calculateQuoteTotal();
 }
 
 function convertToOrder(quoteIdx) {
