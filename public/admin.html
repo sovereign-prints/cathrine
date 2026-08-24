@@ -665,10 +665,6 @@
         <div class="section">
           <h2>Today's Overview</h2>
           <div class="stat-cards">
-            <div class="stat-card info">
-              <span class="stat-label">New Enquiries</span>
-              <span class="stat-value" id="todayEnquiries">0</span>
-            </div>
             <div class="stat-card warning">
               <span class="stat-label">Quotes Awaiting Approval</span>
               <span class="stat-value" id="quotesAwaitingApproval">0</span>
@@ -1089,47 +1085,38 @@
           displayGallery();
         }
 
-        // Load projects
-        const projectsRes = await fetch('/api/admin/projects', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
-        if (projectsRes.ok) {
-          allProjects = await projectsRes.json();
-          displayProjects();
-          updateDashboardStats();
-        }
-
-        // Load quotes
-        const quotesRes = await fetch('/api/admin/quotes', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
-        if (quotesRes.ok) {
-          allQuotes = await quotesRes.json();
-          displayQuotes();
-          updateDashboardStats();
-        }
+        // Dashboard stats come from the Order & Quote Tracking page's saved data
+        updateDashboardStats();
       } catch (error) {
         console.error('Error loading data:', error);
       }
     }
 
-    // DASHBOARD STATS
+    // DASHBOARD STATS — pulled from the Order & Quote Tracking page's data
     function updateDashboardStats() {
-      // New enquiries (quotes from today)
-      const today = new Date().toISOString().split('T')[0];
-      const todayEnquiries = allQuotes.filter(q => q.createdAt && q.createdAt.startsWith(today)).length;
-      document.getElementById('todayEnquiries').textContent = todayEnquiries;
+      let quotes = [];
+      let orders = [];
 
-      // Quotes awaiting approval (pending status)
-      const awaiting = allQuotes.filter(q => q.status === 'pending').length;
-      document.getElementById('quotesAwaitingApproval').textContent = awaiting;
+      try {
+        const saved = localStorage.getItem('orderTrackingData');
+        if (saved) {
+          const data = JSON.parse(saved);
+          quotes = data.quotes || [];
+          orders = data.orders || [];
+        }
+      } catch (e) {
+        console.error('Error reading order tracking data:', e);
+      }
 
-      // Orders in progress
-      const inProgress = allProjects.filter(p => p.status === 'in-progress').length;
+      // Quotes awaiting approval = saved quotes not yet converted to an order
+      document.getElementById('quotesAwaitingApproval').textContent = quotes.length;
+
+      // Orders in progress = QUOTED or PROCESSING
+      const inProgress = orders.filter(o => o.status === 'QUOTED' || o.status === 'PROCESSING').length;
       document.getElementById('ordersInProgress').textContent = inProgress;
 
-      // Orders complete
-      const complete = allProjects.filter(p => p.status === 'complete').length;
+      // Orders complete = COMPLETE or DELIVERED
+      const complete = orders.filter(o => o.status === 'COMPLETE' || o.status === 'DELIVERED').length;
       document.getElementById('ordersComplete').textContent = complete;
     }
 
