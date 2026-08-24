@@ -650,6 +650,9 @@ window.addEventListener('DOMContentLoaded', () => {
   if (galleryForm) {
     galleryForm.addEventListener('submit', uploadGalleryImage);
   }
+
+  // Setup Projects tab
+  setupProjectsTab();
 });
 
 function uploadProductImage(event) {
@@ -732,4 +735,231 @@ function uploadGalleryImage(event) {
     console.error('Error uploading gallery item:', error);
     alert('Error uploading gallery item');
   });
+}
+
+// ============ PROJECT TRACKING FUNCTIONS ============
+
+function setupProjectsTab() {
+  const form = document.getElementById('newProjectForm');
+  if (form) {
+    form.addEventListener('submit', handleAddProject);
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dueDate').min = today;
+  }
+  loadProjects();
+}
+
+async function loadProjects() {
+  try {
+    const response = await fetch(`${API_BASE}/admin/projects`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await response.json();
+    displayProjects(data.projects || []);
+  } catch (error) {
+    console.error('Error loading projects:', error);
+  }
+}
+
+function displayProjects(projects) {
+  const listContainer = document.getElementById('projectsList');
+  if (!projects || projects.length === 0) {
+    listContainer.innerHTML = '<p style="grid-column: 1/-1; color: #9ca3af; text-align: center; padding: 40px;">No projects yet. Create one above!</p>';
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const sorted = [...projects].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+  listContainer.innerHTML = sorted.map(project => {
+    const isOverdue = project.dueDate < today && !['complete', 'delivered', 'cancelled'].includes(project.status);
+    const statusClass = `status-${project.status.replace(' ', '-')}`;
+    return `
+      <div class="project-card ${isOverdue ? 'overdue' : ''}">
+        <div class="project-title">${project.projectName}</div>
+        <div class="project-customer">
+          <strong>${project.customerName}</strong><br>
+          ${project.customerEmail ? `<a href="mailto:${project.customerEmail}">${project.customerEmail}</a>` : ''}
+          ${project.customerPhone ? `<br>📞 ${project.customerPhone}` : ''}
+        </div>
+        ${project.serviceType ? `<div style="font-size: 12px; color: #666;">Service: ${project.serviceType}</div>` : ''}
+        ${project.description ? `<div style="font-size: 12px; color: #666; margin: 5px 0;">Desc: ${project.description}</div>` : ''}
+        ${project.quotedPrice ? `<div style="font-size: 12px; color: #666;">Price: ${project.quotedPrice}</div>` : ''}
+        <div class="project-due ${isOverdue ? 'overdue' : ''}">
+          <strong>Due:</strong> ${new Date(project.dueDate).toLocaleDateString()} ${isOverdue ? '⚠️ OVERDUE' : ''}
+          <span class="status-badge ${statusClass}">${project.status.toUpperCase()}</span>
+        </div>
+        ${project.notes ? `<div style="font-size: 12px; background: #f9f9f9; padding: 8px; border-left: 3px solid #ddd; margin: 8px 0; font-style: italic;">${project.notes}</div>` : ''}
+        <div class="project-actions">
+          <button onclick="editProject(${project.id})">✏️ Edit</button>
+          <button onclick="changeStatus(${project.id})">📊 Status</button>
+          <button onclick="deleteProject(${project.id})">🗑️ Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function handleAddProject(e) {
+  e.preventDefault();
+
+  const project = {
+    projectName: document.getElementById('projectName').value,
+    customerName: document.getElementById('customerName').value,
+    customerEmail: document.getElementById('customerEmail').value,
+    customerPhone: document.getElementById('customerPhone').value,
+    serviceType: document.getElementById('serviceType').value,
+    description: document.getElementById('description').value,
+    quotedPrice: document.getElementById('quotedPrice').value,
+    dueDate: document.getElementById('dueDate').value,
+    status: document.getElementById('status').value,
+    notes: document.getElementById('notes').value
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/admin/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(project)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert(`✅ ${result.message}`);
+      document.getElementById('newProjectForm').reset();
+      loadProjects();
+    } else {
+      alert(`❌ ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Error creating project:', error);
+    alert('❌ Failed to create project');
+  }
+}
+
+function editProject(projectId) {
+  fetch(`${API_BASE}/admin/projects/${projectId}`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const p = data.project;
+    document.getElementById('projectName').value = p.projectName;
+    document.getElementById('customerName').value = p.customerName;
+    document.getElementById('customerEmail').value = p.customerEmail;
+    document.getElementById('customerPhone').value = p.customerPhone;
+    document.getElementById('serviceType').value = p.serviceType;
+    document.getElementById('description').value = p.description;
+    document.getElementById('quotedPrice').value = p.quotedPrice;
+    document.getElementById('dueDate').value = p.dueDate;
+    document.getElementById('status').value = p.status;
+    document.getElementById('notes').value = p.notes;
+
+    const form = document.getElementById('newProjectForm');
+    const btn = form.querySelector('button[type="submit"]');
+    btn.textContent = '✅ Update Project';
+    btn.onclick = (e) => updateProject(e, projectId);
+
+    document.querySelector('button[data-tab="projects"]').click();
+    document.getElementById('projectName').focus();
+  });
+}
+
+async function updateProject(e, projectId) {
+  e.preventDefault();
+
+  const project = {
+    projectName: document.getElementById('projectName').value,
+    customerName: document.getElementById('customerName').value,
+    customerEmail: document.getElementById('customerEmail').value,
+    customerPhone: document.getElementById('customerPhone').value,
+    serviceType: document.getElementById('serviceType').value,
+    description: document.getElementById('description').value,
+    quotedPrice: document.getElementById('quotedPrice').value,
+    dueDate: document.getElementById('dueDate').value,
+    status: document.getElementById('status').value,
+    notes: document.getElementById('notes').value
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/admin/projects/${projectId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(project)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert('✅ Project updated successfully!');
+      document.getElementById('newProjectForm').reset();
+      const btn = document.getElementById('newProjectForm').querySelector('button[type="submit"]');
+      btn.textContent = '💾 Save Project';
+      btn.onclick = null;
+      loadProjects();
+    }
+  } catch (error) {
+    alert('❌ Failed to update project');
+  }
+}
+
+function changeStatus(projectId) {
+  const statuses = ['quoted', 'processing', 'complete', 'delivered', 'on-hold', 'cancelled'];
+  const selection = prompt(
+    'Select new status:\n\n1. QUOTED\n2. PROCESSING\n3. COMPLETE\n4. DELIVERED\n5. ON-HOLD\n6. CANCELLED\n\nEnter number (1-6):'
+  );
+
+  if (!selection) return;
+  const statusIndex = parseInt(selection) - 1;
+  if (statusIndex < 0 || statusIndex >= statuses.length) {
+    alert('Invalid selection');
+    return;
+  }
+
+  updateProjectStatus(projectId, statuses[statusIndex]);
+}
+
+async function updateProjectStatus(projectId, status) {
+  try {
+    const response = await fetch(`${API_BASE}/admin/projects/${projectId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ status })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert(`✅ Status changed to ${status.toUpperCase()}`);
+      loadProjects();
+    }
+  } catch (error) {
+    alert('❌ Failed to update status');
+  }
+}
+
+async function deleteProject(projectId) {
+  if (!confirm('Are you sure you want to delete this project?')) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/admin/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      alert('✅ Project deleted successfully!');
+      loadProjects();
+    }
+  } catch (error) {
+    alert('❌ Failed to delete project');
+  }
 }

@@ -89,6 +89,9 @@ function initializeData() {
 
   // Initialize templates with defaults
   initializeDefaultTemplates();
+
+  // Initialize projects data
+  initializeProjectsData();
 }
 
 // Helper functions to read/write data
@@ -870,6 +873,211 @@ app.get('/api/gallery', (req, res) => {
     res.json(activeGallery);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ PROJECT TRACKING ENDPOINTS ============
+
+const projectsFile = path.join(dataDir, 'projects.json');
+
+// Initialize projects data
+function initializeProjectsData() {
+  if (!fs.existsSync(projectsFile)) {
+    fs.writeFileSync(projectsFile, JSON.stringify({ projects: [] }, null, 2));
+    console.log('Projects data initialized');
+  }
+}
+
+// Load projects from file
+function loadProjects() {
+  try {
+    const data = fs.readFileSync(projectsFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading projects:', error);
+    return { projects: [] };
+  }
+}
+
+// Save projects to file
+function saveProjects(data) {
+  try {
+    fs.writeFileSync(projectsFile, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving projects:', error);
+    return false;
+  }
+}
+
+// Get all projects (admin only)
+app.get('/api/admin/projects', authenticateAdmin, (req, res) => {
+  try {
+    const data = loadProjects();
+    data.projects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
+// Get single project by ID (admin only)
+app.get('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+  try {
+    const data = loadProjects();
+    const project = data.projects.find(p => p.id === parseInt(req.params.id));
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    res.json({ project });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch project' });
+  }
+});
+
+// Create new project (admin only)
+app.post('/api/admin/projects', authenticateAdmin, (req, res) => {
+  try {
+    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes } = req.body;
+
+    if (!projectName || !customerName || !dueDate || !status) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const data = loadProjects();
+    const newProject = {
+      id: Date.now(),
+      projectName: projectName.trim(),
+      customerName: customerName.trim(),
+      customerEmail: customerEmail?.trim() || '',
+      customerPhone: customerPhone?.trim() || '',
+      serviceType: serviceType || 'General',
+      description: description?.trim() || '',
+      quotedPrice: quotedPrice?.trim() || '',
+      dueDate,
+      status: status.toLowerCase(),
+      notes: notes?.trim() || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    data.projects.push(newProject);
+    if (saveProjects(data)) {
+      res.json({ success: true, project: newProject, message: `Project "${projectName}" created successfully` });
+    } else {
+      res.status(500).json({ error: 'Failed to save project' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create project' });
+  }
+});
+
+// Update project (admin only)
+app.patch('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const updates = req.body;
+
+    const data = loadProjects();
+    const projectIndex = data.projects.findIndex(p => p.id === projectId);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const allowedFields = ['projectName', 'customerName', 'customerEmail', 'customerPhone', 'serviceType', 'description', 'quotedPrice', 'dueDate', 'status', 'notes'];
+    allowedFields.forEach(field => {
+      if (updates.hasOwnProperty(field)) {
+        data.projects[projectIndex][field] = typeof updates[field] === 'string' ? updates[field].trim() : updates[field];
+      }
+    });
+
+    data.projects[projectIndex].updatedAt = new Date().toISOString();
+
+    if (saveProjects(data)) {
+      res.json({ success: true, project: data.projects[projectIndex], message: 'Project updated successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to save project' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update project' });
+  }
+});
+
+// Update project status only (admin only)
+app.patch('/api/admin/projects/:id/status', authenticateAdmin, (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const { status, notes } = req.body;
+
+    if (!status) return res.status(400).json({ error: 'Status is required' });
+
+    const data = loadProjects();
+    const projectIndex = data.projects.findIndex(p => p.id === projectId);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    data.projects[projectIndex].status = status.toLowerCase();
+    if (notes) data.projects[projectIndex].notes = notes;
+    data.projects[projectIndex].updatedAt = new Date().toISOString();
+
+    if (saveProjects(data)) {
+      res.json({ success: true, project: data.projects[projectIndex], message: `Project status changed to ${status}` });
+    } else {
+      res.status(500).json({ error: 'Failed to save project' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update project status' });
+  }
+});
+
+// Delete project (admin only)
+app.delete('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const data = loadProjects();
+    const projectIndex = data.projects.findIndex(p => p.id === projectId);
+
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const deletedProject = data.projects[projectIndex];
+    data.projects.splice(projectIndex, 1);
+
+    if (saveProjects(data)) {
+      res.json({ success: true, message: `Project "${deletedProject.projectName}" deleted successfully` });
+    } else {
+      res.status(500).json({ error: 'Failed to delete project' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+// Get project statistics (admin only)
+app.get('/api/admin/projects/stats/overview', authenticateAdmin, (req, res) => {
+  try {
+    const data = loadProjects();
+    const projects = data.projects;
+    const today = new Date().toISOString().split('T')[0];
+
+    const stats = {
+      total: projects.length,
+      quoted: projects.filter(p => p.status === 'quoted').length,
+      processing: projects.filter(p => p.status === 'processing').length,
+      complete: projects.filter(p => p.status === 'complete').length,
+      delivered: projects.filter(p => p.status === 'delivered').length,
+      onHold: projects.filter(p => p.status === 'on-hold').length,
+      cancelled: projects.filter(p => p.status === 'cancelled').length,
+      overdue: projects.filter(p => {
+        return p.dueDate < today && !['complete', 'delivered', 'cancelled'].includes(p.status);
+      }).length
+    };
+
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch project statistics' });
   }
 });
 
