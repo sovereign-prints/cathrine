@@ -1,7 +1,7 @@
 // ============ ADMIN PRODUCTS & GALLERY MANAGEMENT ============
+// Note: allProducts and allGalleryItems are declared in admin.js
+// This file extends that functionality with products/gallery management
 
-let allProducts = [];
-let allGalleryItems = [];
 let editingProductId = null;
 let editingGalleryId = null;
 
@@ -326,8 +326,12 @@ async function uploadProductImage() {
   formData.append('image', imageInput.files[0]);
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch('/api/admin/products', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
@@ -361,8 +365,12 @@ async function uploadGalleryItem() {
   formData.append('image', imageInput.files[0]);
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch('/api/admin/gallery', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
@@ -414,9 +422,13 @@ async function saveProductChanges() {
   }
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${editingProductId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ name, description, basePrice: price })
     });
 
@@ -442,9 +454,13 @@ async function saveGalleryChanges() {
   }
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/gallery/${editingGalleryId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ title, category, description })
     });
 
@@ -549,8 +565,12 @@ async function saveProductImage(event, productId) {
   formData.append('image', fileInput.files[0]);
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${productId}/image`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
@@ -578,9 +598,13 @@ async function saveProductTitle(event, productId) {
   }
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${productId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ name, description, category })
     });
 
@@ -601,8 +625,12 @@ async function deleteProduct(productId) {
   if (!confirm('Are you sure you want to delete this product?')) return;
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${productId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (!response.ok) throw new Error('Delete failed');
@@ -619,8 +647,12 @@ async function deleteGallery(galleryId) {
   if (!confirm('Are you sure you want to delete this gallery item?')) return;
 
   try {
+    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/gallery/${galleryId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (!response.ok) throw new Error('Delete failed');
