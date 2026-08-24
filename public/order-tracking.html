@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- Updated: 2026-08-24 - Simplified quote builder -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -14,24 +13,27 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #f5f5f5;
+            background: #0f0f1a;
+            color: #eceef5;
             padding: 20px;
         }
 
         .container {
             max-width: 1000px;
             margin: 0 auto;
-            background: white;
+            background: #1b1e30;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             overflow: hidden;
+            border: 1px solid #34395c;
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;
+            position: relative;
         }
 
         .header h1 {
@@ -47,8 +49,8 @@
         .tabs {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            background: #f9f9f9;
-            border-bottom: 1px solid #eee;
+            background: #242844;
+            border-bottom: 1px solid #34395c;
         }
 
         .tab-btn {
@@ -60,17 +62,19 @@
             font-weight: 500;
             border-bottom: 3px solid transparent;
             transition: all 0.3s ease;
+            color: #a3a7c2;
         }
 
         .tab-btn.active {
-            border-bottom-color: #667eea;
-            color: #667eea;
+            border-bottom-color: #6366f1;
+            color: #818cf8;
             font-weight: 600;
         }
 
         .tabs-content {
             padding: 30px;
             min-height: 500px;
+            background: #1b1e30;
         }
 
         .tab-content {
@@ -85,8 +89,8 @@
             font-size: 20px;
             font-weight: 600;
             margin-bottom: 20px;
-            color: #333;
-            border-bottom: 2px solid #667eea;
+            color: #eceef5;
+            border-bottom: 2px solid #6366f1;
             padding-bottom: 10px;
         }
 
@@ -94,23 +98,17 @@
             margin-bottom: 16px;
         }
 
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: #555;
-        }
-
         .form-group input,
         .form-group select,
         .form-group textarea {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
+            border: 1px solid #34395c;
             border-radius: 6px;
             font-size: 14px;
             font-family: inherit;
+            background: #242844;
+            color: #eceef5;
         }
 
         .form-group textarea {
@@ -122,8 +120,8 @@
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
         }
 
         .form-row {
@@ -150,17 +148,25 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            background: #10b981;
             color: white;
+        }
+
+        .btn-primary:hover {
+            background: #059669;
         }
 
         .btn-secondary {
-            background: #6c757d;
+            background: #6366f1;
             color: white;
         }
 
+        .btn-secondary:hover {
+            background: #4f46e5;
+        }
+
         .btn-info {
-            background: #17a2b8;
+            background: #3b82f6;
             color: white;
         }
 
@@ -174,23 +180,23 @@
         }
 
         .card {
-            border: 1px solid #ddd;
+            border: 1px solid #34395c;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 16px;
-            background: #fafafa;
+            background: #242844;
         }
 
         .card.quoted {
-            border-left: 4px solid #0056b3;
+            border-left: 4px solid #6366f1;
         }
 
         .card.processing {
-            border-left: 4px solid #ff9800;
+            border-left: 4px solid #f59e0b;
         }
 
         .card.complete {
-            border-left: 4px solid #28a745;
+            border-left: 4px solid #10b981;
         }
 
         .card-header {
@@ -203,7 +209,7 @@
         .card-title {
             font-size: 16px;
             font-weight: 600;
-            color: #333;
+            color: #eceef5;
         }
 
         .badge {
@@ -216,23 +222,23 @@
         }
 
         .badge-quoted {
-            background: #e7f3ff;
-            color: #0056b3;
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
         }
 
         .badge-processing {
-            background: #fff3cd;
-            color: #856404;
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
         }
 
         .badge-complete {
-            background: #d4edda;
-            color: #155724;
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
         }
 
         .card-info {
             font-size: 13px;
-            color: #666;
+            color: #a3a7c2;
             line-height: 1.6;
             margin-bottom: 12px;
         }
@@ -246,16 +252,18 @@
 
         .action-btn {
             padding: 8px;
-            background: white;
-            border: 1px solid #ddd;
+            background: #1b1e30;
+            border: 1px solid #34395c;
             border-radius: 4px;
             font-size: 12px;
             cursor: pointer;
             transition: all 0.2s;
+            color: #eceef5;
         }
 
         .action-btn:hover {
-            background: #f0f0f0;
+            background: #242844;
+            border-color: #6366f1;
         }
 
         .line-item {
@@ -265,9 +273,9 @@
             margin-bottom: 10px;
             align-items: end;
             padding: 10px;
-            background: white;
+            background: #242844;
             border-radius: 4px;
-            border: 1px solid #ddd;
+            border: 1px solid #34395c;
         }
 
         .line-item input {
@@ -352,6 +360,7 @@
 
 <div class="container">
     <div class="header">
+        <button onclick="window.location.href='admin.html'" style="position: absolute; top: 20px; left: 20px; padding: 8px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">← Back to Admin</button>
         <h1>📦 Order & Quote Tracking</h1>
         <p>Manage quotes, orders, and deadlines</p>
     </div>
@@ -369,73 +378,87 @@
         <div id="quotes" class="tab-content active">
             <div class="section-title">💬 Create Quote</div>
 
-            <!-- Client Info -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="required">Client Name</label>
-                    <input type="text" id="quoteCustName" placeholder="Enter client name" required>
-                </div>
-                <div class="form-group">
-                    <label>Company</label>
-                    <input type="text" id="quoteCompany" placeholder="Optional">
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="quoteCustEmail" placeholder="client@example.com">
-                </div>
-                <div class="form-group">
-                    <label>Phone</label>
-                    <input type="tel" id="quoteCustPhone" placeholder="+27 (0) 11 XXXX XXXX">
-                </div>
-            </div>
-
-            <!-- Line Items -->
-            <div class="section-title" style="margin-top: 30px;">📦 Items</div>
-
-            <div id="lineItemsContainer" style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-                <div class="line-item" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; padding: 12px; border-bottom: 1px solid #e0e0e0; align-items: center; background: white;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 13px;">Product/Service</div>
-                        <div style="font-size: 12px; color: #999;">Description</div>
+            <form id="quoteForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">Customer Name</label>
+                        <input type="text" id="quoteCustName" placeholder="John Smith" required>
                     </div>
-                    <input type="number" placeholder="Qty" class="item-qty" value="1" min="1" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px;">
-                    <div class="currency-input" style="position: relative;">
-                        <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-weight: 600;">R</span>
-                        <input type="number" placeholder="0" class="item-price" value="0" min="0" step="50" style="padding: 8px 8px 8px 24px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="quoteCustEmail" placeholder="john@company.com">
                     </div>
-                    <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px; background: white; border: 1px solid #e0e0e0; color: #e74c3c; cursor: pointer; border-radius: 6px;">✕</button>
                 </div>
-            </div>
 
-            <button type="button" class="btn btn-info" onclick="addLineItem()" style="margin-top: 12px; width: 100%; padding: 12px; background: #f5f7fa; border: 2px dashed #e0e0e0; color: #667eea; font-weight: 600; border-radius: 8px; cursor: pointer;">+ Add Item</button>
-
-            <!-- Total -->
-            <div class="quote-total" style="margin-top: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px; border-radius: 8px;">
-                <div class="quote-total-row" style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 700;">
-                    <div>Total Due:</div>
-                    <div id="quoteTotal">R 0</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" id="quoteCustPhone" placeholder="555-1234">
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Service Type</label>
+                        <select id="quoteService" required>
+                            <option value="">Select service</option>
+                            <option>Printing</option>
+                            <option>Clothing</option>
+                            <option>Signage</option>
+                            <option>Vehicle Branding</option>
+                            <option>Custom</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Notes & Terms -->
-            <div class="form-row" style="margin-top: 20px;">
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Payment Terms</label>
-                    <textarea id="quoteNotes" placeholder="e.g., 50% deposit required, balance due before production" style="height: 80px;">50% deposit required
-Balance due before production
-Payment via bank transfer</textarea>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="quoteDesc" placeholder="Project details and requirements"></textarea>
                 </div>
-            </div>
 
-            <!-- Actions -->
-            <div class="buttons" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
-                <button type="button" class="btn btn-secondary" onclick="resetQuoteForm()" style="flex: 1;">Clear</button>
-                <button type="button" class="btn btn-primary" onclick="printQuote()" style="flex: 1;">📄 Print Quote</button>
-                <button type="button" class="btn btn-primary" onclick="saveQuote()" style="flex: 1; background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">✓ Submit Quote</button>
-            </div>
+                <div class="section-title" style="margin-top: 30px;">Line Items</div>
+
+                <div id="lineItemsContainer">
+                    <div class="line-item">
+                        <input type="text" placeholder="Product/Service" class="item-name">
+                        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1">
+                        <input type="number" placeholder="Unit Price" class="item-price" value="0" min="0" step="0.01">
+                        <input type="text" placeholder="Subtotal" class="item-subtotal" readonly disabled>
+                        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px;">Remove</button>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-info" onclick="addLineItem()" style="margin-top: 10px;">+ Add Item</button>
+
+                <div class="quote-total">
+                    <div class="quote-total-row">
+                        <div>Subtotal:</div>
+                        <div id="subtotal">R 0.00</div>
+                    </div>
+                    <div class="quote-total-row">
+                        <div>Tax (15%):</div>
+                        <div id="tax">R 0.00</div>
+                    </div>
+                    <div class="quote-total-row total">
+                        <div>TOTAL:</div>
+                        <div id="quoteTotal">R 0.00</div>
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label>Valid Until (Days)</label>
+                        <input type="number" id="quoteValidDays" value="7" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="quoteNotes" placeholder="Additional notes or terms"></textarea>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button type="button" class="btn btn-primary" onclick="saveQuote()">💾 Save Quote</button>
+                    <button type="button" class="btn btn-info" onclick="downloadQuoteJSON()">📥 Export Quote</button>
+                    <button type="reset" class="btn btn-secondary">Clear</button>
+                </div>
+            </form>
 
             <!-- Quotes List -->
             <div style="margin-top: 40px;">
@@ -644,44 +667,46 @@ function switchTab(e, tabName) {
 function addLineItem() {
     const container = document.getElementById('lineItemsContainer');
     const newItem = document.createElement('div');
-    newItem.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; padding: 12px; border-bottom: 1px solid #e0e0e0; align-items: center; background: white;';
     newItem.className = 'line-item';
     newItem.innerHTML = `
-        <div>
-            <input type="text" placeholder="Product/Service" class="item-name" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-weight: 600;">
-            <input type="text" placeholder="Description" class="item-desc" style="width: 100%; padding: 6px; border: none; font-size: 12px; color: #999; margin-top: 4px;">
-        </div>
-        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1" style="padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; text-align: center;">
-        <div style="position: relative;">
-            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-weight: 600;">R</span>
-            <input type="number" placeholder="0" class="item-price" value="0" min="0" step="50" style="width: 100%; padding: 8px 8px 8px 24px; border: 1px solid #e0e0e0; border-radius: 6px;">
-        </div>
-        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px; background: white; border: 1px solid #e0e0e0; color: #e74c3c; cursor: pointer; border-radius: 6px;">✕</button>
+        <input type="text" placeholder="Product/Service" class="item-name">
+        <input type="number" placeholder="Qty" class="item-qty" value="1" min="1">
+        <input type="number" placeholder="Unit Price" class="item-price" value="0" min="0" step="0.01">
+        <input type="text" placeholder="Subtotal" class="item-subtotal" readonly disabled>
+        <button type="button" class="btn btn-secondary" onclick="removeLineItem(this)" style="padding: 8px;">Remove</button>
     `;
     container.appendChild(newItem);
     attachLineItemListeners(newItem);
 }
 
 function removeLineItem(btn) {
-    btn.closest('.line-item').remove();
+    btn.parentElement.remove();
     calculateQuoteTotal();
 }
 
 function attachLineItemListeners(element) {
     const inputs = element.querySelectorAll('.item-qty, .item-price');
     inputs.forEach(input => input.addEventListener('change', calculateQuoteTotal));
-    inputs.forEach(input => input.addEventListener('input', calculateQuoteTotal));
 }
 
 function calculateQuoteTotal() {
-    let total = 0;
+    let subtotal = 0;
     document.querySelectorAll('.line-item').forEach(item => {
         const qty = parseFloat(item.querySelector('.item-qty').value) || 0;
         const price = parseFloat(item.querySelector('.item-price').value) || 0;
-        total += qty * price;
+        const itemTotal = qty * price;
+        item.querySelector('.item-subtotal').value = 'R ' + itemTotal.toFixed(2);
+        subtotal += itemTotal;
     });
 
-    document.getElementById('quoteTotal').textContent = 'R ' + Math.round(total).toLocaleString('en-ZA', {minimumFractionDigits: 0});
+    const tax = subtotal * 0.15;
+    const total = subtotal + tax;
+
+    document.getElementById('subtotal').textContent = 'R ' + subtotal.toFixed(2);
+    document.getElementById('tax').textContent = 'R ' + tax.toFixed(2);
+    document.getElementById('quoteTotal').textContent = 'R ' + total.toFixed(2);
+
+    return total;
 }
 
 function saveQuote() {
@@ -691,17 +716,23 @@ function saveQuote() {
         return;
     }
 
+    const total = calculateQuoteTotal();
+    const validDays = document.getElementById('quoteValidDays').value;
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + parseInt(validDays));
+
     const quote = {
         id: 'QT-' + Date.now(),
         custName: custName,
-        company: document.getElementById('quoteCompany').value,
         custEmail: document.getElementById('quoteCustEmail').value,
         custPhone: document.getElementById('quoteCustPhone').value,
-        total: document.getElementById('quoteTotal').textContent,
+        service: document.getElementById('quoteService').value,
+        desc: document.getElementById('quoteDesc').value,
+        total: total,
+        validUntil: validUntil.toLocaleDateString(),
         notes: document.getElementById('quoteNotes').value,
         items: Array.from(document.querySelectorAll('.line-item')).map(item => ({
             name: item.querySelector('.item-name').value,
-            desc: item.querySelector('.item-desc').value,
             qty: item.querySelector('.item-qty').value,
             price: item.querySelector('.item-price').value
         })),
@@ -710,24 +741,9 @@ function saveQuote() {
 
     quotes.push(quote);
     saveData();
-    resetQuoteForm();
-    showMessage('✅ Quote submitted to projects!', 'success');
+    document.getElementById('quoteForm').reset();
+    showMessage('✅ Quote saved successfully!', 'success');
     displayQuotes();
-}
-
-function printQuote() {
-    window.print();
-}
-
-function resetQuoteForm() {
-    document.getElementById('quoteCustName').value = '';
-    document.getElementById('quoteCompany').value = '';
-    document.getElementById('quoteCustEmail').value = '';
-    document.getElementById('quoteCustPhone').value = '';
-    document.getElementById('quoteNotes').value = '50% deposit required\nBalance due before production\nPayment via bank transfer';
-    document.getElementById('lineItemsContainer').innerHTML = '';
-    addLineItem();
-    calculateQuoteTotal();
 }
 
 function convertToOrder(quoteIdx) {
