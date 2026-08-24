@@ -1,9 +1,7 @@
 // ============ ADMIN PRODUCTS & GALLERY MANAGEMENT ============
-// Note: allProducts and allGalleryItems are declared in admin.js
-// This file extends that functionality with products/gallery management
 
-let editingProductId = null;
-let editingGalleryId = null;
+// NOTE: Global variables (allProducts, allGalleryItems, editingProductId, editingGalleryId)
+// are already declared in admin.js - do not redeclare them here
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -565,12 +563,8 @@ async function saveProductImage(event, productId) {
   formData.append('image', fileInput.files[0]);
 
   try {
-    const token = localStorage.getItem('adminToken');
     const response = await fetch(`/api/admin/products/${productId}/image`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
       body: formData
     });
 
