@@ -931,7 +931,7 @@
 
   <script>
     // STATE
-    let adminToken = null;
+    let isLoggedIn = false;
     let allProducts = [];
     let allGallery = [];
     let allProjects = [];
@@ -945,15 +945,19 @@
     function init() {
       checkLogin();
       setupEventListeners();
-      loadData();
     }
 
-    function checkLogin() {
-      const token = localStorage.getItem('adminToken');
-      if (token) {
-        adminToken = token;
-        showDashboard();
-      } else {
+    async function checkLogin() {
+      try {
+        const response = await fetch('/api/admin/session');
+        if (response.ok) {
+          isLoggedIn = true;
+          showDashboard();
+          loadData();
+        } else {
+          showLoginScreen();
+        }
+      } catch (error) {
         showLoginScreen();
       }
     }
@@ -1032,9 +1036,7 @@
         });
 
         if (response.ok) {
-          const data = await response.json();
-          adminToken = data.token;
-          localStorage.setItem('adminToken', adminToken);
+          isLoggedIn = true;
           showDashboard();
           loadData();
           document.getElementById('adminPassword').value = '';
@@ -1048,9 +1050,13 @@
       }
     }
 
-    function handleLogout() {
-      localStorage.removeItem('adminToken');
-      adminToken = null;
+    async function handleLogout() {
+      try {
+        await fetch('/api/admin/logout', { method: 'POST' });
+      } catch (error) {
+        console.error('Error logging out:', error);
+      }
+      isLoggedIn = false;
       showLoginScreen();
       document.getElementById('adminPassword').value = '';
     }
@@ -1064,59 +1070,55 @@
 
     // DATA LOADING
     async function loadData() {
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         // Load products
-        const productsRes = await fetch('/api/admin/products', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
+        const productsRes = await fetch('/api/admin/products');
         if (productsRes.ok) {
           allProducts = await productsRes.json();
           displayProducts();
         }
 
         // Load gallery
-        const galleryRes = await fetch('/api/admin/gallery', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
+        const galleryRes = await fetch('/api/admin/gallery');
         if (galleryRes.ok) {
           allGallery = await galleryRes.json();
           displayGallery();
         }
 
-        // Dashboard stats come from the Order & Quote Tracking page's saved data
-        updateDashboardStats();
+        await updateDashboardStats();
       } catch (error) {
         console.error('Error loading data:', error);
       }
     }
 
-    // DASHBOARD STATS — pulled from the Order & Quote Tracking page's data
-    function updateDashboardStats() {
+    // DASHBOARD STATS — pulled live from the backend
+    async function updateDashboardStats() {
       let quotes = [];
       let orders = [];
 
       try {
-        const saved = localStorage.getItem('orderTrackingData');
-        if (saved) {
-          const data = JSON.parse(saved);
-          quotes = data.quotes || [];
-          orders = data.orders || [];
-        }
+        const [quotesRes, projectsRes] = await Promise.all([
+          fetch('/api/admin/quotes'),
+          fetch('/api/admin/projects')
+        ]);
+        if (quotesRes.ok) quotes = await quotesRes.json();
+        if (projectsRes.ok) orders = (await projectsRes.json()).projects || [];
       } catch (e) {
-        console.error('Error reading order tracking data:', e);
+        console.error('Error loading dashboard stats:', e);
       }
 
-      // Quotes awaiting approval = saved quotes not yet converted to an order
-      document.getElementById('quotesAwaitingApproval').textContent = quotes.length;
+      // Quotes awaiting approval = quotes still pending
+      const pendingQuotes = quotes.filter(q => q.status === 'pending').length;
+      document.getElementById('quotesAwaitingApproval').textContent = pendingQuotes;
 
-      // Orders in progress = QUOTED or PROCESSING
-      const inProgress = orders.filter(o => o.status === 'QUOTED' || o.status === 'PROCESSING').length;
+      // Orders in progress = quoted or processing
+      const inProgress = orders.filter(o => o.status === 'quoted' || o.status === 'processing').length;
       document.getElementById('ordersInProgress').textContent = inProgress;
 
-      // Orders complete = COMPLETE or DELIVERED
-      const complete = orders.filter(o => o.status === 'COMPLETE' || o.status === 'DELIVERED').length;
+      // Orders complete = complete or delivered
+      const complete = orders.filter(o => o.status === 'complete' || o.status === 'delivered').length;
       document.getElementById('ordersComplete').textContent = complete;
     }
 
@@ -1166,7 +1168,7 @@
 
     async function handleApproveQuote(e) {
       e.preventDefault();
-      if (!adminToken || !editingQuoteId) return;
+      if (!isLoggedIn || !editingQuoteId) return;
 
       const projectData = {
         name: `${document.getElementById('quoteCustomerName').value} - ${document.getElementById('quoteServiceType').value}`,
@@ -1182,21 +1184,15 @@
       try {
         const response = await fetch('/api/admin/projects', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(projectData)
         });
 
         if (response.ok) {
           // Mark quote as approved
           await fetch(`/api/admin/quotes/${editingQuoteId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${adminToken}`,
-              'Content-Type': 'application/json'
-            },
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'approved' })
           });
 
@@ -1232,7 +1228,7 @@
 
     async function handleAddProduct(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const formData = new FormData();
       formData.append('name', document.getElementById('productName').value);
@@ -1247,7 +1243,6 @@
       try {
         const response = await fetch('/api/admin/products', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${adminToken}` },
           body: formData
         });
 
@@ -1276,12 +1271,11 @@
 
     async function deleteProduct(id) {
       if (!confirm('Delete this product?')) return;
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         const response = await fetch(`/api/admin/products/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {
@@ -1316,7 +1310,7 @@
 
     async function handleAddGallery(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const formData = new FormData();
       formData.append('title', document.getElementById('galleryTitle').value);
@@ -1331,7 +1325,6 @@
       try {
         const response = await fetch('/api/admin/gallery', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${adminToken}` },
           body: formData
         });
 
@@ -1360,12 +1353,11 @@
 
     async function deleteGallery(id) {
       if (!confirm('Delete this gallery item?')) return;
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         const response = await fetch(`/api/admin/gallery/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {
@@ -1401,7 +1393,7 @@
 
     async function handleAddProject(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const data = {
         name: document.getElementById('projectName').value,
@@ -1418,10 +1410,7 @@
       try {
         const response = await fetch('/api/admin/projects', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
 
@@ -1464,7 +1453,7 @@
 
     async function handleUpdateProject(e) {
       e.preventDefault();
-      if (!adminToken || !editingProjectId) return;
+      if (!isLoggedIn || !editingProjectId) return;
 
       const data = {
         status: document.getElementById('projectEditStatus').value,
@@ -1475,11 +1464,8 @@
 
       try {
         const response = await fetch(`/api/admin/projects/${editingProjectId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
 
@@ -1494,12 +1480,11 @@
 
     async function deleteProject() {
       if (!confirm('Delete this project?')) return;
-      if (!adminToken || !editingProjectId) return;
+      if (!isLoggedIn || !editingProjectId) return;
 
       try {
         const response = await fetch(`/api/admin/projects/${editingProjectId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {

@@ -526,7 +526,7 @@
             <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                 <h3 style="margin-bottom: 15px;">Export Data</h3>
                 <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-                    Download all quotes and orders as JSON files for backup or sharing.
+                    Download a fresh backup of all quotes and orders currently stored on the server.
                 </p>
                 <div class="buttons" style="grid-template-columns: repeat(2, 1fr);">
                     <button class="btn btn-info" onclick="downloadAllJSON()">📥 Export All Data</button>
@@ -535,25 +535,8 @@
                 </div>
             </div>
 
-            <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px;">Import Data</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-                    Upload a JSON file to restore or merge data.
-                </p>
-                <input type="file" id="fileInput" class="file-input" accept=".json" onchange="importJSON()">
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📤 Import JSON File</button>
-            </div>
-
-            <div style="background: #fff3cd; padding: 20px; border-radius: 8px;">
-                <h3 style="margin-bottom: 10px;">⚠️ Clear All Data</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-                    This will permanently delete all quotes and orders. Use export first to backup.
-                </p>
-                <button class="btn btn-secondary" onclick="if(confirm('Are you sure? This cannot be undone!')) clearAllData()">🗑️ Clear All Data</button>
-            </div>
-
             <div style="margin-top: 30px; padding: 16px; background: #f0f4ff; border-radius: 6px;">
-                <strong>Data Storage Stats:</strong>
+                <strong>Data Storage:</strong>
                 <p id="storageStats" style="font-size: 13px; margin-top: 8px; color: #666;"></p>
             </div>
         </div>
@@ -564,26 +547,41 @@
 let quotes = [];
 let orders = [];
 
-function loadData() {
-    const saved = localStorage.getItem('orderTrackingData');
-    if (saved) {
-        const data = JSON.parse(saved);
-        quotes = data.quotes || [];
-        orders = data.orders || [];
+async function loadData() {
+    await Promise.all([loadQuotes(), loadOrders()]);
+    updateStorageStats();
+}
+
+function extractTotalFromRequirements(requirements) {
+    const match = (requirements || '').match(/Total:\s*R\s*([\d.,]+)/i);
+    return match ? match[1] : '';
+}
+
+async function loadQuotes() {
+    try {
+        const res = await fetch('/api/admin/quotes');
+        if (!res.ok) throw new Error('Failed to load quotes');
+        const all = await res.json();
+        quotes = all.filter(q => q.status === 'pending');
+    } catch (e) {
+        console.error('Error loading quotes:', e);
+        quotes = [];
     }
-    refreshAllDisplays();
-}
-
-function saveData() {
-    localStorage.setItem('orderTrackingData', JSON.stringify({ quotes, orders }));
-    updateStorageStats();
-}
-
-function refreshAllDisplays() {
     displayQuotes();
-    displayOrders();
     populateQuoteSelect();
-    updateStorageStats();
+}
+
+async function loadOrders() {
+    try {
+        const res = await fetch('/api/admin/projects');
+        if (!res.ok) throw new Error('Failed to load orders');
+        const data = await res.json();
+        orders = data.projects || [];
+    } catch (e) {
+        console.error('Error loading orders:', e);
+        orders = [];
+    }
+    displayOrders();
 }
 
 function displayQuotes() {
@@ -593,28 +591,30 @@ function displayQuotes() {
         return;
     }
 
-    container.innerHTML = quotes.map((q, i) => `
+    container.innerHTML = quotes.map(q => {
+        const total = extractTotalFromRequirements(q.requirements);
+        return `
         <div class="card quoted">
             <div class="card-header">
                 <div>
-                    <div class="card-title">${q.service} - ${q.custName}</div>
+                    <div class="card-title">${q.service || '-'} - ${q.customerName}</div>
                     <span class="badge badge-quoted">QUOTE</span>
                 </div>
-                <div><strong>R ${parseFloat(q.total).toFixed(2)}</strong></div>
+                <div><strong>${total ? 'R ' + total : '-'}</strong></div>
             </div>
             <div class="card-info">
-                <div>📧 ${q.custEmail || 'No email'}</div>
-                <div>📱 ${q.custPhone || 'No phone'}</div>
-                <div>📝 ${q.desc || 'No description'}</div>
-                <div>Valid until: ${q.validUntil}</div>
+                <div>📧 ${q.customerEmail || 'No email'}</div>
+                <div>📱 ${q.customerPhone || 'No phone'}</div>
+                <div>📝 ${q.description || 'No description'}</div>
+                <div>Reference: ${q.referenceNumber}</div>
             </div>
             <div class="card-actions">
-                <button class="action-btn" onclick="convertToOrder(${i})">🔄 Convert to Order</button>
-                <button class="action-btn" onclick="editQuote(${i})">✏️ Edit</button>
-                <button class="action-btn" onclick="deleteQuote(${i})">🗑️ Delete</button>
+                <button class="action-btn" onclick="convertToOrder(${q.id})">🔄 Convert to Order</button>
+                <button class="action-btn" onclick="deleteQuote(${q.id})">🗑️ Delete</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function displayOrders() {
@@ -624,27 +624,27 @@ function displayOrders() {
         return;
     }
 
-    container.innerHTML = orders.map((o, i) => {
-        const cardClass = `card ${o.status.toLowerCase() === 'processing' ? 'processing' : o.status.toLowerCase() === 'complete' ? 'complete' : 'quoted'}`;
-        const isOverdue = new Date(o.deadline) < new Date();
+    container.innerHTML = orders.map(o => {
+        const cardClass = `card ${o.status === 'processing' ? 'processing' : o.status === 'complete' ? 'complete' : 'quoted'}`;
+        const isOverdue = new Date(o.dueDate) < new Date();
         return `
             <div class="${cardClass}">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">${o.orderID}</div>
-                        <span class="badge badge-${o.status.toLowerCase()}">${o.status}</span>
+                        <div class="card-title">${o.projectName}</div>
+                        <span class="badge badge-${o.status}">${o.status.toUpperCase()}</span>
                     </div>
-                    <div><strong>R ${parseFloat(o.total).toFixed(2)}</strong></div>
+                    <div><strong>${o.quotedPrice || '-'}</strong></div>
                 </div>
                 <div class="card-info">
-                    <div>👤 ${o.custName}</div>
-                    <div>📅 Deadline: ${o.deadline} ${isOverdue ? '⚠️ OVERDUE' : ''}</div>
+                    <div>👤 ${o.customerName}</div>
+                    <div>📅 Due: ${o.dueDate} ${isOverdue ? '⚠️ OVERDUE' : ''}</div>
                     <div>📝 ${o.notes || 'No notes'}</div>
                 </div>
                 <div class="card-actions">
-                    <button class="action-btn" onclick="editOrder(${i})">✏️ Edit</button>
-                    <button class="action-btn" onclick="updateOrderStatus(${i})">📊 Status</button>
-                    <button class="action-btn" onclick="deleteOrder(${i})">🗑️ Delete</button>
+                    <button class="action-btn" onclick="editOrder(${o.id})">✏️ Edit</button>
+                    <button class="action-btn" onclick="updateOrderStatus(${o.id})">📊 Status</button>
+                    <button class="action-btn" onclick="deleteOrder(${o.id})">🗑️ Delete</button>
                 </div>
             </div>
         `;
@@ -654,7 +654,7 @@ function displayOrders() {
 function populateQuoteSelect() {
     const select = document.getElementById('quoteSelect');
     select.innerHTML = '<option value="">-- Select a quote --</option>' +
-        quotes.map((q, i) => `<option value="${i}">${q.service} - ${q.custName} (R ${q.total})</option>`).join('');
+        quotes.map(q => `<option value="${q.id}">${q.service || '-'} - ${q.customerName}</option>`).join('');
 }
 
 function switchTab(e, tabName) {
@@ -709,7 +709,7 @@ function calculateQuoteTotal() {
     return total;
 }
 
-function saveQuote() {
+async function saveQuote() {
     const custName = document.getElementById('quoteCustName').value;
     if (!custName) {
         showMessage('Please enter customer name', 'error');
@@ -717,37 +717,59 @@ function saveQuote() {
     }
 
     const total = calculateQuoteTotal();
+    const subtotal = document.getElementById('subtotal').textContent;
+    const tax = document.getElementById('tax').textContent;
     const validDays = document.getElementById('quoteValidDays').value;
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + parseInt(validDays));
+    const notes = document.getElementById('quoteNotes').value;
+
+    const itemLines = Array.from(document.querySelectorAll('.line-item'))
+        .map(item => {
+            const name = item.querySelector('.item-name').value;
+            const qty = item.querySelector('.item-qty').value;
+            const price = item.querySelector('.item-price').value;
+            if (!name) return null;
+            return `- ${name} x${qty} @ R${parseFloat(price || 0).toFixed(2)}`;
+        })
+        .filter(Boolean);
+
+    const requirements = [
+        ...itemLines,
+        `Subtotal: ${subtotal}`,
+        `Tax (15%): ${tax}`,
+        `Total: ${document.getElementById('quoteTotal').textContent}`,
+        `Valid until: ${validUntil.toLocaleDateString()}`,
+        notes ? `Notes: ${notes}` : null
+    ].filter(Boolean).join('\n');
 
     const quote = {
-        id: 'QT-' + Date.now(),
-        custName: custName,
-        custEmail: document.getElementById('quoteCustEmail').value,
-        custPhone: document.getElementById('quoteCustPhone').value,
+        customerName: custName,
+        customerEmail: document.getElementById('quoteCustEmail').value,
+        customerPhone: document.getElementById('quoteCustPhone').value,
         service: document.getElementById('quoteService').value,
-        desc: document.getElementById('quoteDesc').value,
-        total: total,
-        validUntil: validUntil.toLocaleDateString(),
-        notes: document.getElementById('quoteNotes').value,
-        items: Array.from(document.querySelectorAll('.line-item')).map(item => ({
-            name: item.querySelector('.item-name').value,
-            qty: item.querySelector('.item-qty').value,
-            price: item.querySelector('.item-price').value
-        })),
-        createdAt: new Date().toLocaleString()
+        description: document.getElementById('quoteDesc').value,
+        requirements
     };
 
-    quotes.push(quote);
-    saveData();
-    document.getElementById('quoteForm').reset();
-    showMessage('✅ Quote saved successfully!', 'success');
-    displayQuotes();
+    try {
+        const res = await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(quote)
+        });
+        if (!res.ok) throw new Error('Server rejected the quote');
+
+        document.getElementById('quoteForm').reset();
+        showMessage('✅ Quote saved successfully!', 'success');
+        await loadQuotes();
+    } catch (e) {
+        showMessage('❌ Could not save quote: ' + e.message, 'error');
+    }
 }
 
-function convertToOrder(quoteIdx) {
-    const quote = quotes[quoteIdx];
+function convertToOrder(quoteId) {
+    const quote = quotes.find(q => q.id === quoteId);
     if (!quote) return;
 
     // Switch to the Orders tab so the form is actually visible
@@ -756,73 +778,75 @@ function convertToOrder(quoteIdx) {
     document.getElementById('orders').classList.add('active');
     document.querySelector('.tab-btn[onclick*="orders"]').classList.add('active');
 
-    // Pre-select this quote in the dropdown
-    document.getElementById('quoteSelect').value = quoteIdx;
-
-    document.getElementById('orderForm').style.display = 'block';
-    document.getElementById('orderID').value = 'ORD-' + Date.now();
-
-    const deadline = new Date();
-    deadline.setDate(deadline.getDate() + 7);
-    document.getElementById('orderDeadline').value = deadline.toISOString().split('T')[0];
-
-    document.getElementById('orderForm').dataset.quoteIdx = quoteIdx;
+    document.getElementById('quoteSelect').value = quoteId;
+    showOrderFormForQuote(quoteId);
 }
 
 function loadQuoteForOrder() {
     const select = document.getElementById('quoteSelect');
-    const idx = select.value;
-    if (idx === '') {
+    const quoteId = select.value;
+    if (quoteId === '') {
         document.getElementById('orderForm').style.display = 'none';
         return;
     }
+    showOrderFormForQuote(parseInt(quoteId));
+}
 
-    const quote = quotes[idx];
+function showOrderFormForQuote(quoteId) {
     document.getElementById('orderForm').style.display = 'block';
-    document.getElementById('orderID').value = 'ORD-' + Date.now();
+    document.getElementById('orderID').value = 'Pending save';
 
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + 7);
     document.getElementById('orderDeadline').value = deadline.toISOString().split('T')[0];
 
-    document.getElementById('orderForm').dataset.quoteIdx = idx;
+    document.getElementById('orderForm').dataset.quoteId = quoteId;
 }
 
-function saveOrder() {
-    const quoteIdx = document.getElementById('orderForm').dataset.quoteIdx;
-    const quote = quotes[quoteIdx];
+async function saveOrder() {
+    const quoteId = parseInt(document.getElementById('orderForm').dataset.quoteId);
+    const quote = quotes.find(q => q.id === quoteId);
     if (!quote) {
         showMessage('Could not find the original quote. Please reselect it.', 'error');
         return;
     }
 
-    const order = {
-        orderID: document.getElementById('orderID').value,
-        custName: quote.custName,
-        custEmail: quote.custEmail,
-        status: document.getElementById('orderStatus').value,
-        deadline: document.getElementById('orderDeadline').value,
-        notes: document.getElementById('orderNotes').value,
-        total: quote.total,
-        items: quote.items,
-        quoteRef: quote.id,
-        createdAt: new Date().toLocaleString()
+    const project = {
+        projectName: `${quote.service || 'Order'} - ${quote.customerName}`,
+        customerName: quote.customerName,
+        customerEmail: quote.customerEmail,
+        customerPhone: quote.customerPhone,
+        serviceType: quote.service,
+        description: quote.description,
+        quotedPrice: extractTotalFromRequirements(quote.requirements) ? 'R ' + extractTotalFromRequirements(quote.requirements) : '',
+        dueDate: document.getElementById('orderDeadline').value,
+        status: document.getElementById('orderStatus').value.toLowerCase(),
+        notes: document.getElementById('orderNotes').value
     };
 
-    orders.push(order);
+    try {
+        const createRes = await fetch('/api/admin/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(project)
+        });
+        if (!createRes.ok) throw new Error('Failed to create order');
 
-    // Remove the converted quote from the Quotes list so it doesn't sit there duplicated
-    quotes.splice(quoteIdx, 1);
+        // Mark the source quote as converted so it drops off the pending list
+        await fetch(`/api/admin/quotes/${quoteId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'converted', notes: quote.notes || '' })
+        });
 
-    saveData();
-    document.getElementById('orderForm').style.display = 'none';
-    document.getElementById('orderForm').removeAttribute('data-quote-idx');
-    delete document.getElementById('orderForm').dataset.quoteIdx;
-    document.getElementById('quoteSelect').value = '';
-    showMessage('✅ Order created successfully! Quote moved to Orders.', 'success');
-    displayQuotes();
-    displayOrders();
-    populateQuoteSelect();
+        document.getElementById('orderForm').style.display = 'none';
+        delete document.getElementById('orderForm').dataset.quoteId;
+        document.getElementById('quoteSelect').value = '';
+        showMessage('✅ Order created successfully! Quote moved to Orders.', 'success');
+        await loadData();
+    } catch (e) {
+        showMessage('❌ Could not create order: ' + e.message, 'error');
+    }
 }
 
 function cancelOrder() {
@@ -830,31 +854,102 @@ function cancelOrder() {
     document.getElementById('quoteSelect').value = '';
 }
 
-function deleteQuote(idx) {
-    if (confirm('Delete this quote?')) {
-        quotes.splice(idx, 1);
-        saveData();
-        displayQuotes();
+async function deleteQuote(id) {
+    if (!confirm('Delete this quote?')) return;
+    try {
+        const res = await fetch(`/api/admin/quotes/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'dismissed' })
+        });
+        if (!res.ok) throw new Error('Server rejected the request');
+        await loadQuotes();
+    } catch (e) {
+        showMessage('❌ Could not delete quote: ' + e.message, 'error');
     }
 }
 
-function deleteOrder(idx) {
-    if (confirm('Delete this order?')) {
-        orders.splice(idx, 1);
-        saveData();
-        displayOrders();
+async function deleteOrder(id) {
+    if (!confirm('Delete this order?')) return;
+    try {
+        const res = await fetch(`/api/admin/projects/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Server rejected the request');
+        await loadOrders();
+    } catch (e) {
+        showMessage('❌ Could not delete order: ' + e.message, 'error');
     }
 }
 
-function downloadAllJSON() {
-    downloadJSON({ quotes, orders }, 'order-tracking-all');
+async function updateOrderStatus(id) {
+    const statuses = ['quoted', 'processing', 'complete', 'delivered', 'on-hold', 'cancelled'];
+    const selection = prompt(
+        'Select new status:\n\n1. QUOTED\n2. PROCESSING\n3. COMPLETE\n4. DELIVERED\n5. ON-HOLD\n6. CANCELLED\n\nEnter number (1-6):'
+    );
+    if (!selection) return;
+    const statusIndex = parseInt(selection) - 1;
+    if (statusIndex < 0 || statusIndex >= statuses.length) {
+        showMessage('Invalid selection', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/admin/projects/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: statuses[statusIndex] })
+        });
+        if (!res.ok) throw new Error('Server rejected the request');
+        showMessage('✅ Status updated', 'success');
+        await loadOrders();
+    } catch (e) {
+        showMessage('❌ Could not update status: ' + e.message, 'error');
+    }
 }
 
-function downloadQuotesJSON() {
+async function editOrder(id) {
+    const order = orders.find(o => o.id === id);
+    if (!order) return;
+
+    const newDueDate = prompt('Due date (YYYY-MM-DD):', order.dueDate);
+    if (newDueDate === null) return;
+    const newNotes = prompt('Notes:', order.notes || '');
+    if (newNotes === null) return;
+
+    try {
+        const res = await fetch(`/api/admin/projects/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dueDate: newDueDate, notes: newNotes })
+        });
+        if (!res.ok) throw new Error('Server rejected the request');
+        showMessage('✅ Order updated', 'success');
+        await loadOrders();
+    } catch (e) {
+        showMessage('❌ Could not update order: ' + e.message, 'error');
+    }
+}
+
+async function fetchAllTrackingData() {
+    const [quotesRes, projectsRes] = await Promise.all([
+        fetch('/api/admin/quotes'),
+        fetch('/api/admin/projects')
+    ]);
+    const allQuotes = quotesRes.ok ? await quotesRes.json() : [];
+    const allOrders = projectsRes.ok ? (await projectsRes.json()).projects || [] : [];
+    return { quotes: allQuotes, orders: allOrders };
+}
+
+async function downloadAllJSON() {
+    downloadJSON(await fetchAllTrackingData(), 'order-tracking-all');
+}
+
+async function downloadQuotesJSON() {
+    const { quotes } = await fetchAllTrackingData();
     downloadJSON({ quotes }, 'quotes');
 }
 
-function downloadOrdersJSON() {
+async function downloadOrdersJSON() {
+    const { orders } = await fetchAllTrackingData();
     downloadJSON({ orders }, 'orders');
 }
 
@@ -1049,34 +1144,6 @@ function downloadJSON(data, filename) {
     showMessage('✅ File downloaded: ' + a.download, 'success');
 }
 
-function importJSON() {
-    const file = document.getElementById('fileInput').files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const imported = JSON.parse(e.target.result);
-            if (imported.quotes) quotes = quotes.concat(imported.quotes);
-            if (imported.orders) orders = orders.concat(imported.orders);
-            saveData();
-            showMessage('✅ Data imported successfully!', 'success');
-        } catch (err) {
-            showMessage('❌ Invalid JSON file', 'error');
-        }
-    };
-    reader.readAsText(file);
-    document.getElementById('fileInput').value = '';
-}
-
-function clearAllData() {
-    quotes = [];
-    orders = [];
-    saveData();
-    showMessage('✅ All data cleared', 'success');
-    refreshAllDisplays();
-}
-
 function showMessage(text, type) {
     const box = document.getElementById('msgBox');
     box.textContent = text;
@@ -1087,8 +1154,9 @@ function showMessage(text, type) {
 function updateStorageStats() {
     const stats = document.getElementById('storageStats');
     stats.innerHTML = `
-        Quotes: ${quotes.length} | Orders: ${orders.length}<br>
-        Last updated: ${new Date().toLocaleTimeString()}
+        Pending quotes: ${quotes.length} | Orders: ${orders.length}<br>
+        Stored in the database — survives restarts and redeploys.<br>
+        Last refreshed: ${new Date().toLocaleTimeString()}
     `;
 }
 
