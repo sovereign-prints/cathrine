@@ -963,6 +963,10 @@
           </div>
           <img id="productEditImagePreview" class="image-preview" style="display: none;">
         </div>
+        <div class="form-group">
+          <label>Pricing Tiers (R per unit, by quantity)</label>
+          <div id="productEditPricingTiers"></div>
+        </div>
         <div class="btn-group" style="margin-top: 20px;">
           <button type="submit" class="btn btn-primary">Save Changes</button>
           <button type="button" class="btn btn-secondary" onclick="closeProductEditModal()">Cancel</button>
@@ -1388,6 +1392,18 @@
       document.getElementById('productEditDescription').value = product.description || '';
       document.getElementById('productEditImagePreview').style.display = 'none';
       document.getElementById('productEditImageInput').value = '';
+
+      const tiersContainer = document.getElementById('productEditPricingTiers');
+      const tiers = product.pricingTiers || [];
+      tiersContainer.innerHTML = tiers.map(t => `
+        <div class="form-row" data-tier-id="${t.id}" style="align-items:center; gap:8px; margin-bottom:6px;">
+          <div style="flex:1;">${t.quantityMax ? `${t.quantityMin}–${t.quantityMax} units` : `${t.quantityMin}+ units`}</div>
+          <div style="width:120px;">
+            <input type="number" step="0.01" min="0" class="tier-price-input" value="${t.price}" style="width:100%;">
+          </div>
+        </div>
+      `).join('') || '<div style="color:var(--text-light);font-size:13px;">No pricing tiers for this product.</div>';
+
       document.getElementById('productEditModal').classList.add('active');
     }
 
@@ -1444,6 +1460,18 @@
             body: formData
           });
           if (!imgRes.ok) throw new Error('Failed to update product image');
+        }
+
+        const tierRows = document.querySelectorAll('#productEditPricingTiers [data-tier-id]');
+        for (const row of tierRows) {
+          const tierId = row.dataset.tierId;
+          const price = row.querySelector('.tier-price-input').value;
+          const tierRes = await fetch(`/api/admin/pricing/${tierId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ price })
+          });
+          if (!tierRes.ok) throw new Error('Failed to update a pricing tier');
         }
 
         closeProductEditModal();

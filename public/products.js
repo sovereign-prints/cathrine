@@ -88,7 +88,7 @@ function displayProducts() {
       <div class="product-info">
         <h3>${product.name}</h3>
         <p>${product.description || 'Custom branding and printing service'}</p>
-        <div class="product-price">From $${product.basePrice || '0'}</div>
+        <div class="product-price">From R${product.basePrice || '0'}</div>
         <button class="btn-view" data-product-id="${product.id}">View Details</button>
       </div>
     </div>
@@ -176,16 +176,16 @@ function showProductModal(productId) {
   }
 
   // Set pricing table
-  if (product.pricing && Array.isArray(product.pricing)) {
+  if (product.pricingTiers && Array.isArray(product.pricingTiers) && product.pricingTiers.length) {
     pricingTable.innerHTML = `
       <tr>
         <th>Quantity</th>
         <th>Price</th>
       </tr>
-      ${product.pricing.map(p => `
+      ${product.pricingTiers.map(p => `
         <tr>
-          <td>${p.quantity}</td>
-          <td>$${p.price}</td>
+          <td>${p.quantityMax ? `${p.quantityMin}-${p.quantityMax}` : `${p.quantityMin}+`}</td>
+          <td>R${p.price}</td>
         </tr>
       `).join('')}
     `;

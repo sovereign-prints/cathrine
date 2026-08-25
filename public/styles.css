@@ -174,21 +174,6 @@ body {
   transform: rotate(-45deg) translate(7px, -7px);
 }
 
-.admin-link {
-  background: var(--accent);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 10px;
-  text-transform: uppercase;
-  margin-right: 8px;
-  font-weight: 600;
-}
-
-.admin-link:hover {
-  background: var(--accent-dark);
-  color: var(--white);
-}
-
 /* ============ DESKTOP NAVBAR ============ */
 
 @media (min-width: 769px) {
@@ -244,11 +229,6 @@ body {
     display: none;
   }
 
-  .admin-link {
-    margin-right: 0;
-    padding: 8px 16px;
-    font-size: 12px;
-  }
 }
 
 /* ============ HERO SECTION ============ */
@@ -1259,11 +1239,42 @@ body {
 }
 
 .footer-bottom {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding-top: 15px;
+  padding-right: 38px;
   border-top: 1px solid rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.6);
   font-size: 13px;
+}
+
+.admin-icon-link {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.35);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.admin-icon-link:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--white);
 }
 
 @media (min-width: 481px) {

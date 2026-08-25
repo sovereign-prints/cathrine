@@ -359,6 +359,18 @@ app.patch('/api/admin/quotes/:id', adminAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/admin/quotes/:id', adminAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('DELETE FROM quotes WHERE id = $1 RETURNING id', [parseInt(req.params.id)]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Quote not found' });
+    }
+    res.json({ success: true, message: 'Quote deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ ADMIN PRODUCT ROUTES ============
 
 app.get('/api/admin/products', adminAuth, async (req, res) => {
