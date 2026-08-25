@@ -929,9 +929,94 @@
     </div>
   </div>
 
+  <!-- PRODUCT EDIT MODAL -->
+  <div id="productEditModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeProductEditModal()">&times;</span>
+      <h2>Edit Product</h2>
+      <form id="productEditForm" style="margin-top: 16px;" onsubmit="handleUpdateProduct(event)">
+        <div class="form-group">
+          <label>Product Name</label>
+          <input type="text" id="productEditName" required>
+        </div>
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="productEditCategory" required>
+            <option value="">— Select category —</option>
+            <option value="Printing">Printing</option>
+            <option value="Clothing">Clothing</option>
+            <option value="Signage">Signage</option>
+            <option value="Vehicle Branding">Vehicle Branding</option>
+            <option value="Promotional Items">Promotional Items</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="productEditDescription"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Replace Image (optional)</label>
+          <div class="image-upload" id="productEditImageUpload" onclick="document.getElementById('productEditImageInput').click();">
+            <div>📸 Click to upload or drag and drop</div>
+            <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">PNG, JPG up to 5MB</div>
+            <input type="file" id="productEditImageInput" accept="image/*" onchange="previewProductEditImage()">
+          </div>
+          <img id="productEditImagePreview" class="image-preview" style="display: none;">
+        </div>
+        <div class="btn-group" style="margin-top: 20px;">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeProductEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- GALLERY EDIT MODAL -->
+  <div id="galleryEditModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeGalleryEditModal()">&times;</span>
+      <h2>Edit Gallery Item</h2>
+      <form id="galleryEditForm" style="margin-top: 16px;" onsubmit="handleUpdateGallery(event)">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="galleryEditTitle" required>
+        </div>
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="galleryEditCategory" required>
+            <option value="">— Select category —</option>
+            <option value="Clothing">Clothing</option>
+            <option value="Printing">Printing</option>
+            <option value="Vehicle Branding">Vehicle Branding</option>
+            <option value="Signage">Signage</option>
+            <option value="Promotional Items">Promotional Items</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="galleryEditDescription"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Replace Image (optional)</label>
+          <div class="image-upload" id="galleryEditImageUpload" onclick="document.getElementById('galleryEditImageInput').click();">
+            <div>📸 Click to upload or drag and drop</div>
+            <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">PNG, JPG up to 5MB</div>
+            <input type="file" id="galleryEditImageInput" accept="image/*" onchange="previewGalleryEditImage()">
+          </div>
+          <img id="galleryEditImagePreview" class="image-preview" style="display: none;">
+        </div>
+        <div class="btn-group" style="margin-top: 20px;">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeGalleryEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     // STATE
-    let adminToken = null;
+    let isLoggedIn = false;
     let allProducts = [];
     let allGallery = [];
     let allProjects = [];
@@ -945,15 +1030,19 @@
     function init() {
       checkLogin();
       setupEventListeners();
-      loadData();
     }
 
-    function checkLogin() {
-      const token = localStorage.getItem('adminToken');
-      if (token) {
-        adminToken = token;
-        showDashboard();
-      } else {
+    async function checkLogin() {
+      try {
+        const response = await fetch('/api/admin/session');
+        if (response.ok) {
+          isLoggedIn = true;
+          showDashboard();
+          loadData();
+        } else {
+          showLoginScreen();
+        }
+      } catch (error) {
         showLoginScreen();
       }
     }
@@ -1032,9 +1121,7 @@
         });
 
         if (response.ok) {
-          const data = await response.json();
-          adminToken = data.token;
-          localStorage.setItem('adminToken', adminToken);
+          isLoggedIn = true;
           showDashboard();
           loadData();
           document.getElementById('adminPassword').value = '';
@@ -1048,9 +1135,13 @@
       }
     }
 
-    function handleLogout() {
-      localStorage.removeItem('adminToken');
-      adminToken = null;
+    async function handleLogout() {
+      try {
+        await fetch('/api/admin/logout', { method: 'POST' });
+      } catch (error) {
+        console.error('Error logging out:', error);
+      }
+      isLoggedIn = false;
       showLoginScreen();
       document.getElementById('adminPassword').value = '';
     }
@@ -1064,59 +1155,55 @@
 
     // DATA LOADING
     async function loadData() {
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         // Load products
-        const productsRes = await fetch('/api/admin/products', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
+        const productsRes = await fetch('/api/admin/products');
         if (productsRes.ok) {
           allProducts = await productsRes.json();
           displayProducts();
         }
 
         // Load gallery
-        const galleryRes = await fetch('/api/admin/gallery', {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
+        const galleryRes = await fetch('/api/admin/gallery');
         if (galleryRes.ok) {
           allGallery = await galleryRes.json();
           displayGallery();
         }
 
-        // Dashboard stats come from the Order & Quote Tracking page's saved data
-        updateDashboardStats();
+        await updateDashboardStats();
       } catch (error) {
         console.error('Error loading data:', error);
       }
     }
 
-    // DASHBOARD STATS — pulled from the Order & Quote Tracking page's data
-    function updateDashboardStats() {
+    // DASHBOARD STATS — pulled live from the backend
+    async function updateDashboardStats() {
       let quotes = [];
       let orders = [];
 
       try {
-        const saved = localStorage.getItem('orderTrackingData');
-        if (saved) {
-          const data = JSON.parse(saved);
-          quotes = data.quotes || [];
-          orders = data.orders || [];
-        }
+        const [quotesRes, projectsRes] = await Promise.all([
+          fetch('/api/admin/quotes'),
+          fetch('/api/admin/projects')
+        ]);
+        if (quotesRes.ok) quotes = await quotesRes.json();
+        if (projectsRes.ok) orders = (await projectsRes.json()).projects || [];
       } catch (e) {
-        console.error('Error reading order tracking data:', e);
+        console.error('Error loading dashboard stats:', e);
       }
 
-      // Quotes awaiting approval = saved quotes not yet converted to an order
-      document.getElementById('quotesAwaitingApproval').textContent = quotes.length;
+      // Quotes awaiting approval = quotes still pending
+      const pendingQuotes = quotes.filter(q => q.status === 'pending').length;
+      document.getElementById('quotesAwaitingApproval').textContent = pendingQuotes;
 
-      // Orders in progress = QUOTED or PROCESSING
-      const inProgress = orders.filter(o => o.status === 'QUOTED' || o.status === 'PROCESSING').length;
+      // Orders in progress = quoted or processing
+      const inProgress = orders.filter(o => o.status === 'quoted' || o.status === 'processing').length;
       document.getElementById('ordersInProgress').textContent = inProgress;
 
-      // Orders complete = COMPLETE or DELIVERED
-      const complete = orders.filter(o => o.status === 'COMPLETE' || o.status === 'DELIVERED').length;
+      // Orders complete = complete or delivered
+      const complete = orders.filter(o => o.status === 'complete' || o.status === 'delivered').length;
       document.getElementById('ordersComplete').textContent = complete;
     }
 
@@ -1166,7 +1253,7 @@
 
     async function handleApproveQuote(e) {
       e.preventDefault();
-      if (!adminToken || !editingQuoteId) return;
+      if (!isLoggedIn || !editingQuoteId) return;
 
       const projectData = {
         name: `${document.getElementById('quoteCustomerName').value} - ${document.getElementById('quoteServiceType').value}`,
@@ -1182,21 +1269,15 @@
       try {
         const response = await fetch('/api/admin/projects', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(projectData)
         });
 
         if (response.ok) {
           // Mark quote as approved
           await fetch(`/api/admin/quotes/${editingQuoteId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${adminToken}`,
-              'Content-Type': 'application/json'
-            },
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'approved' })
           });
 
@@ -1223,6 +1304,7 @@
             <div class="item-card-title">${product.name}</div>
             <div class="item-card-category">${product.category}</div>
             <div class="item-actions">
+              <button onclick="openProductEditModal(${product.id})">Edit</button>
               <button onclick="deleteProduct('${product.id}')">Delete</button>
             </div>
           </div>
@@ -1232,7 +1314,7 @@
 
     async function handleAddProduct(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const formData = new FormData();
       formData.append('name', document.getElementById('productName').value);
@@ -1247,7 +1329,6 @@
       try {
         const response = await fetch('/api/admin/products', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${adminToken}` },
           body: formData
         });
 
@@ -1276,12 +1357,11 @@
 
     async function deleteProduct(id) {
       if (!confirm('Delete this product?')) return;
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         const response = await fetch(`/api/admin/products/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {
@@ -1289,6 +1369,87 @@
         }
       } catch (error) {
         alert('Error deleting product: ' + error.message);
+      }
+    }
+
+    let editingProductId = null;
+
+    function openProductEditModal(id) {
+      const product = allProducts.find(p => p.id === id);
+      if (!product) return;
+
+      editingProductId = id;
+      document.getElementById('productEditName').value = product.name;
+      const categorySelect = document.getElementById('productEditCategory');
+      if (product.category && ![...categorySelect.options].some(o => o.value === product.category)) {
+        categorySelect.add(new Option(product.category, product.category));
+      }
+      categorySelect.value = product.category;
+      document.getElementById('productEditDescription').value = product.description || '';
+      document.getElementById('productEditImagePreview').style.display = 'none';
+      document.getElementById('productEditImageInput').value = '';
+      document.getElementById('productEditModal').classList.add('active');
+    }
+
+    function closeProductEditModal() {
+      document.getElementById('productEditModal').classList.remove('active');
+      editingProductId = null;
+    }
+
+    function previewProductEditImage() {
+      const input = document.getElementById('productEditImageInput');
+      const preview = document.getElementById('productEditImagePreview');
+      if (input.files.length) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function handleUpdateProduct(e) {
+      e.preventDefault();
+      if (!isLoggedIn || !editingProductId) return;
+
+      const product = allProducts.find(p => p.id === editingProductId);
+      if (!product) return;
+
+      const name = document.getElementById('productEditName').value;
+      const category = document.getElementById('productEditCategory').value;
+      const description = document.getElementById('productEditDescription').value;
+
+      try {
+        const response = await fetch(`/api/admin/products/${editingProductId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name, category, description,
+            basePrice: product.basePrice,
+            specifications: product.specifications,
+            turnaroundDays: product.turnaroundDays,
+            active: product.active
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to update product');
+
+        const imageInput = document.getElementById('productEditImageInput');
+        if (imageInput.files.length) {
+          const formData = new FormData();
+          formData.append('image', imageInput.files[0]);
+          const imgRes = await fetch(`/api/admin/products/${editingProductId}/image`, {
+            method: 'PATCH',
+            body: formData
+          });
+          if (!imgRes.ok) throw new Error('Failed to update product image');
+        }
+
+        closeProductEditModal();
+        loadData();
+      } catch (error) {
+        alert('Error updating product: ' + error.message);
       }
     }
 
@@ -1307,6 +1468,7 @@
             <div class="item-card-title">${item.title}</div>
             <div class="item-card-category">${item.category}</div>
             <div class="item-actions">
+              <button onclick="openGalleryEditModal(${item.id})">Edit</button>
               <button onclick="deleteGallery('${item.id}')">Delete</button>
             </div>
           </div>
@@ -1316,7 +1478,7 @@
 
     async function handleAddGallery(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const formData = new FormData();
       formData.append('title', document.getElementById('galleryTitle').value);
@@ -1331,7 +1493,6 @@
       try {
         const response = await fetch('/api/admin/gallery', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${adminToken}` },
           body: formData
         });
 
@@ -1360,12 +1521,11 @@
 
     async function deleteGallery(id) {
       if (!confirm('Delete this gallery item?')) return;
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       try {
         const response = await fetch(`/api/admin/gallery/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {
@@ -1373,6 +1533,72 @@
         }
       } catch (error) {
         alert('Error deleting gallery item: ' + error.message);
+      }
+    }
+
+    let editingGalleryId = null;
+
+    function openGalleryEditModal(id) {
+      const item = allGallery.find(g => g.id === id);
+      if (!item) return;
+
+      editingGalleryId = id;
+      document.getElementById('galleryEditTitle').value = item.title;
+      const galleryCategorySelect = document.getElementById('galleryEditCategory');
+      if (item.category && ![...galleryCategorySelect.options].some(o => o.value === item.category)) {
+        galleryCategorySelect.add(new Option(item.category, item.category));
+      }
+      galleryCategorySelect.value = item.category;
+      document.getElementById('galleryEditDescription').value = item.description || '';
+      document.getElementById('galleryEditImagePreview').style.display = 'none';
+      document.getElementById('galleryEditImageInput').value = '';
+      document.getElementById('galleryEditModal').classList.add('active');
+    }
+
+    function closeGalleryEditModal() {
+      document.getElementById('galleryEditModal').classList.remove('active');
+      editingGalleryId = null;
+    }
+
+    function previewGalleryEditImage() {
+      const input = document.getElementById('galleryEditImageInput');
+      const preview = document.getElementById('galleryEditImagePreview');
+      if (input.files.length) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function handleUpdateGallery(e) {
+      e.preventDefault();
+      if (!isLoggedIn || !editingGalleryId) return;
+
+      const formData = new FormData();
+      formData.append('title', document.getElementById('galleryEditTitle').value);
+      formData.append('category', document.getElementById('galleryEditCategory').value);
+      formData.append('description', document.getElementById('galleryEditDescription').value);
+
+      const imageInput = document.getElementById('galleryEditImageInput');
+      if (imageInput.files.length) {
+        formData.append('image', imageInput.files[0]);
+      }
+
+      try {
+        const response = await fetch(`/api/admin/gallery/${editingGalleryId}`, {
+          method: 'PATCH',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Failed to update gallery item');
+
+        closeGalleryEditModal();
+        loadData();
+      } catch (error) {
+        alert('Error updating gallery item: ' + error.message);
       }
     }
 
@@ -1401,7 +1627,7 @@
 
     async function handleAddProject(e) {
       e.preventDefault();
-      if (!adminToken) return;
+      if (!isLoggedIn) return;
 
       const data = {
         name: document.getElementById('projectName').value,
@@ -1418,10 +1644,7 @@
       try {
         const response = await fetch('/api/admin/projects', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
 
@@ -1464,7 +1687,7 @@
 
     async function handleUpdateProject(e) {
       e.preventDefault();
-      if (!adminToken || !editingProjectId) return;
+      if (!isLoggedIn || !editingProjectId) return;
 
       const data = {
         status: document.getElementById('projectEditStatus').value,
@@ -1475,11 +1698,8 @@
 
       try {
         const response = await fetch(`/api/admin/projects/${editingProjectId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${adminToken}`,
-            'Content-Type': 'application/json'
-          },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
 
@@ -1494,12 +1714,11 @@
 
     async function deleteProject() {
       if (!confirm('Delete this project?')) return;
-      if (!adminToken || !editingProjectId) return;
+      if (!isLoggedIn || !editingProjectId) return;
 
       try {
         const response = await fetch(`/api/admin/projects/${editingProjectId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          method: 'DELETE'
         });
 
         if (response.ok) {

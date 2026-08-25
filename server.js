@@ -1,23 +1,39 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+const db = require('./db');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.warn('WARNING: ADMIN_JWT_SECRET is not set. Using an insecure development-only secret. Set ADMIN_JWT_SECRET in production.');
+}
+const SESSION_SECRET = JWT_SECRET || 'insecure-dev-secret-do-not-use-in-production';
+const SESSION_COOKIE = 'admin_session';
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser());
 app.use(express.static('public'));
 
-// File upload configuration
+// File upload configuration - files are stored in the database, not on disk,
+// so uploads survive redeploys/restarts on ephemeral hosting.
 const upload = multer({
-  dest: 'uploads/',
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -28,121 +44,98 @@ const upload = multer({
   }
 });
 
-// Ensure required directories exist
-const dirs = ['uploads', 'data'];
-dirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
-
-// Data file paths
-const dataDir = 'data';
-const productsFile = path.join(dataDir, 'products.json');
-const quotesFile = path.join(dataDir, 'quotes.json');
-const galleryFile = path.join(dataDir, 'gallery.json');
-const templatesFile = path.join(dataDir, 'templates.json');
-const projectsFile = path.join(dataDir, 'projects.json');
-
-// Initialize data files
-function initializeData() {
-  const products = [
-    // Clothing
-    { id: 1, name: 'T-Shirt Printing', category: 'Clothing', basePrice: 120, description: 'Custom branded T-shirts for businesses and events', specifications: 'Various sizes, single or multi-color prints', turnaroundDays: 5, active: true, image: '/products_images/products-01-Shirt1.jpg', pricingTiers: [{ id: 1, quantityMin: 1, quantityMax: 10, price: 120 }, { id: 2, quantityMin: 11, quantityMax: 50, price: 108 }, { id: 3, quantityMin: 51, quantityMax: 100, price: 96 }, { id: 4, quantityMin: 101, quantityMax: null, price: 84 }] },
-    { id: 2, name: 'Hoodie Printing', category: 'Clothing', basePrice: 250, description: 'Premium branded hoodies', specifications: 'Unisex fit, durable printing', turnaroundDays: 5, active: true, image: '/products_images/products-01-hoodie.jpg', pricingTiers: [{ id: 5, quantityMin: 1, quantityMax: 10, price: 250 }, { id: 6, quantityMin: 11, quantityMax: 50, price: 225 }, { id: 7, quantityMin: 51, quantityMax: 100, price: 200 }, { id: 8, quantityMin: 101, quantityMax: null, price: 175 }] },
-    { id: 3, name: 'Cap Branding', category: 'Clothing', basePrice: 85, description: 'Custom branded caps', specifications: 'Adjustable or structured', turnaroundDays: 5, active: true, image: '/products_images/products-01-cap.jpg', pricingTiers: [{ id: 9, quantityMin: 1, quantityMax: 10, price: 85 }, { id: 10, quantityMin: 11, quantityMax: 50, price: 76 }, { id: 11, quantityMin: 51, quantityMax: 100, price: 68 }, { id: 12, quantityMin: 101, quantityMax: null, price: 59 }] },
-
-    // Vinyl
-    { id: 4, name: 'Vinyl Decals', category: 'Vinyl', basePrice: 150, description: 'Custom vinyl decals for any surface', specifications: 'Die-cut or standard shapes', turnaroundDays: 5, active: true, image: '/products_images/products-01-sticker.jpg', pricingTiers: [{ id: 13, quantityMin: 1, quantityMax: 10, price: 150 }, { id: 14, quantityMin: 11, quantityMax: 50, price: 135 }, { id: 15, quantityMin: 51, quantityMax: 100, price: 120 }, { id: 16, quantityMin: 101, quantityMax: null, price: 105 }] },
-    { id: 5, name: 'Wall Graphics', category: 'Vinyl', basePrice: 500, description: 'Large-scale wall decals', specifications: 'Custom sizes, easy application', turnaroundDays: 5, active: true, image: '/products_images/products-01-shirt2.jpg', pricingTiers: [{ id: 17, quantityMin: 1, quantityMax: 10, price: 500 }, { id: 18, quantityMin: 11, quantityMax: 50, price: 450 }, { id: 19, quantityMin: 51, quantityMax: 100, price: 400 }, { id: 20, quantityMin: 101, quantityMax: null, price: 350 }] },
-
-    // Vehicle Branding
-    { id: 6, name: 'Full Vehicle Wrap', category: 'Vehicle Branding', basePrice: 5000, description: 'Complete vehicle branding', specifications: 'Includes design consultation', turnaroundDays: 5, active: true, image: '/products_images/products-01-shirt3.jpg', pricingTiers: [{ id: 21, quantityMin: 1, quantityMax: 10, price: 5000 }] },
-    { id: 7, name: 'Partial Wrap', category: 'Vehicle Branding', basePrice: 2500, description: 'Partial vehicle branding', specifications: 'Hood, doors, or side panels', turnaroundDays: 5, active: true, image: '/products_images/products-01-shirt4.jpg', pricingTiers: [{ id: 22, quantityMin: 1, quantityMax: 10, price: 2500 }] },
-
-    // Glass & Mugs
-    { id: 8, name: 'Printed Mug', category: 'Glass & Mugs', basePrice: 95, description: 'Custom printed mugs', specifications: '11oz ceramic mugs', turnaroundDays: 5, active: true, image: '/products_images/products-01-mug.jpg', pricingTiers: [{ id: 23, quantityMin: 1, quantityMax: 10, price: 95 }, { id: 24, quantityMin: 11, quantityMax: 50, price: 85 }, { id: 25, quantityMin: 51, quantityMax: 100, price: 76 }, { id: 26, quantityMin: 101, quantityMax: null, price: 66 }] },
-    { id: 9, name: 'Printed Glass', category: 'Glass & Mugs', basePrice: 120, description: 'Custom printed glasses', specifications: 'Various sizes available', turnaroundDays: 5, active: true, image: '/products_images/products-01-glass.jpg', pricingTiers: [{ id: 27, quantityMin: 1, quantityMax: 10, price: 120 }, { id: 28, quantityMin: 11, quantityMax: 50, price: 108 }, { id: 29, quantityMin: 51, quantityMax: 100, price: 96 }, { id: 30, quantityMin: 101, quantityMax: null, price: 84 }] },
-
-    // Signage
-    { id: 10, name: 'Indoor Signage', category: 'Signage', basePrice: 800, description: 'Indoor business signage', specifications: 'Custom design and installation', turnaroundDays: 5, active: true, image: '/products_images/products-01-Shirt1.jpg', pricingTiers: [{ id: 31, quantityMin: 1, quantityMax: 10, price: 800 }] },
-    { id: 11, name: 'Outdoor Signs', category: 'Signage', basePrice: 1200, description: 'Weather-resistant outdoor signs', specifications: 'Durable materials, UV protected', turnaroundDays: 5, active: true, image: '/products_images/products-01-hoodie.jpg', pricingTiers: [{ id: 32, quantityMin: 1, quantityMax: 10, price: 1200 }] },
-
-    // Printing
-    { id: 12, name: 'Business Cards', category: 'Printing', basePrice: 350, description: 'Professional business cards', specifications: '250 units, 300gsm cardstock', turnaroundDays: 5, active: true, image: '/products_images/products-01-cap.jpg', pricingTiers: [{ id: 33, quantityMin: 1, quantityMax: 10, price: 350 }, { id: 34, quantityMin: 11, quantityMax: 50, price: 315 }, { id: 35, quantityMin: 51, quantityMax: 100, price: 280 }, { id: 36, quantityMin: 101, quantityMax: null, price: 245 }] },
-    { id: 13, name: 'Flyers & Brochures', category: 'Printing', basePrice: 400, description: 'Marketing flyers and brochures', specifications: 'A5 or A4 size, full color', turnaroundDays: 5, active: true, image: '/products_images/products-01-sticker.jpg', pricingTiers: [{ id: 37, quantityMin: 1, quantityMax: 10, price: 400 }, { id: 38, quantityMin: 11, quantityMax: 50, price: 360 }, { id: 39, quantityMin: 51, quantityMax: 100, price: 320 }, { id: 40, quantityMin: 101, quantityMax: null, price: 280 }] }
-  ];
-
-  if (!fs.existsSync(productsFile)) {
-    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
-    console.log('Products data initialized');
-  }
-
-  if (!fs.existsSync(quotesFile)) {
-    fs.writeFileSync(quotesFile, JSON.stringify([], null, 2));
-    console.log('Quotes data initialized');
-  }
-
-  if (!fs.existsSync(galleryFile)) {
-    fs.writeFileSync(galleryFile, JSON.stringify([], null, 2));
-    console.log('Gallery data initialized');
-  }
-
-  // Initialize templates with defaults
-  initializeDefaultTemplates();
-
-  // Initialize projects data
-  initializeProjectsData();
+async function saveUploadedFile(file) {
+  const id = crypto.randomUUID() + path.extname(file.originalname).toLowerCase();
+  await db.query(
+    'INSERT INTO files (id, filename, mimetype, data) VALUES ($1, $2, $3, $4)',
+    [id, file.originalname, file.mimetype, file.buffer]
+  );
+  return `/uploads/${id}`;
 }
 
-// Helper functions to read/write data
-function readProducts() {
-  try {
-    return JSON.parse(fs.readFileSync(productsFile, 'utf8'));
-  } catch {
-    return [];
-  }
+// ============ ROW MAPPERS (DB snake_case -> API camelCase) ============
+
+function mapProduct(row, tiers) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    basePrice: Number(row.base_price),
+    description: row.description || '',
+    specifications: row.specifications || '',
+    turnaroundDays: row.turnaround_days,
+    active: row.active,
+    image: row.image,
+    pricingTiers: (tiers || []).map(t => ({
+      id: t.id,
+      quantityMin: t.quantity_min,
+      quantityMax: t.quantity_max,
+      price: Number(t.price)
+    }))
+  };
 }
 
-function readQuotes() {
-  try {
-    return JSON.parse(fs.readFileSync(quotesFile, 'utf8'));
-  } catch {
-    return [];
-  }
+function mapQuote(row) {
+  return {
+    id: row.id,
+    referenceNumber: row.reference_number,
+    customerName: row.customer_name,
+    customerEmail: row.customer_email,
+    customerPhone: row.customer_phone || '',
+    service: row.service,
+    description: row.description || '',
+    requirements: row.requirements || '',
+    status: row.status,
+    createdAt: row.created_at,
+    respondedAt: row.responded_at,
+    notes: row.notes || ''
+  };
 }
 
-function saveQuotes(quotes) {
-  fs.writeFileSync(quotesFile, JSON.stringify(quotes, null, 2));
+function mapGallery(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    description: row.description || '',
+    image: row.image_url,
+    imageUrl: row.image_url,
+    active: row.active,
+    order: row.display_order,
+    createdAt: row.created_at
+  };
 }
 
-function readGallery() {
-  try {
-    return JSON.parse(fs.readFileSync(galleryFile, 'utf8'));
-  } catch {
-    return [];
-  }
+function mapTemplate(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    description: row.description || '',
+    content: row.content,
+    placeholders: row.placeholders || [],
+    isDefault: row.is_default,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
-function saveGallery(gallery) {
-  fs.writeFileSync(galleryFile, JSON.stringify(gallery, null, 2));
-}
-
-function saveProducts(products) {
-  fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
-}
-
-// Template management functions
-function loadTemplates() {
-  try {
-    return JSON.parse(fs.readFileSync(templatesFile, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function saveTemplates(templates) {
-  fs.writeFileSync(templatesFile, JSON.stringify(templates, null, 2));
+function mapProject(row) {
+  return {
+    id: Number(row.id),
+    projectName: row.project_name,
+    customerName: row.customer_name,
+    customerEmail: row.customer_email || '',
+    customerPhone: row.customer_phone || '',
+    serviceType: row.service_type || 'General',
+    description: row.description || '',
+    quotedPrice: row.quoted_price || '',
+    dueDate: row.due_date instanceof Date ? row.due_date.toISOString().split('T')[0] : row.due_date,
+    status: row.status,
+    notes: row.notes || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 function extractPlaceholders(content) {
@@ -150,160 +143,130 @@ function extractPlaceholders(content) {
   return [...new Set(matches.map(m => m.replace(/[{}]/g, '')))];
 }
 
-function initializeDefaultTemplates() {
-  if (!fs.existsSync(templatesFile)) {
-    const defaultTemplates = [
-      {
-        id: 'default-quote',
-        name: 'Default Quote Template',
-        type: 'quote',
-        description: 'Standard quote template for customer inquiries',
-        content: `<html><head><style>body { font-family: Arial, sans-serif; margin: 40px; } .header { text-align: center; margin-bottom: 30px; } .section { margin: 20px 0; } .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }</style></head><body><div class="header"><h1>{{COMPANY_NAME}}</h1><p>Quote for {{CUSTOMER_NAME}}</p></div><div class="section"><p>Date: {{DATE}}</p><p>Quote Number: {{QUOTE_NUMBER}}</p></div><div class="section"><h2>Details</h2><p>{{QUOTE_DETAILS}}</p></div><div class="section"><h2>Pricing</h2><p>Subtotal: {{SUBTOTAL}}</p><p>Tax: {{TAX}}</p><p><strong>Total: {{TOTAL}}</strong></p></div><div class="footer"><p>Valid until: {{EXPIRY_DATE}}</p><p>Contact: {{CONTACT_EMAIL}} | {{CONTACT_PHONE}}</p></div></body></html>`,
-        placeholders: ['COMPANY_NAME', 'CUSTOMER_NAME', 'DATE', 'QUOTE_NUMBER', 'QUOTE_DETAILS', 'SUBTOTAL', 'TAX', 'TOTAL', 'EXPIRY_DATE', 'CONTACT_EMAIL', 'CONTACT_PHONE'],
-        isDefault: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'default-invoice',
-        name: 'Default Invoice Template',
-        type: 'invoice',
-        description: 'Standard invoice template for orders',
-        content: `<html><head><style>body { font-family: Arial, sans-serif; margin: 40px; } .header { text-align: center; margin-bottom: 30px; } .section { margin: 20px 0; } .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }</style></head><body><div class="header"><h1>{{COMPANY_NAME}}</h1><p>Invoice</p></div><div class="section"><p>Invoice Number: {{INVOICE_NUMBER}}</p><p>Date: {{INVOICE_DATE}}</p><p>Bill To: {{CUSTOMER_NAME}}</p></div><div class="section"><h2>Items</h2><p>{{ITEMS_LIST}}</p></div><div class="section"><h2>Payment</h2><p>Subtotal: {{SUBTOTAL}}</p><p>Tax: {{TAX}}</p><p><strong>Total Due: {{TOTAL_DUE}}</strong></p></div><div class="footer"><p>Due Date: {{DUE_DATE}}</p><p>Payment Instructions: {{PAYMENT_INSTRUCTIONS}}</p><p>Contact: {{CONTACT_EMAIL}} | {{CONTACT_PHONE}}</p></div></body></html>`,
-        placeholders: ['COMPANY_NAME', 'INVOICE_NUMBER', 'INVOICE_DATE', 'CUSTOMER_NAME', 'ITEMS_LIST', 'SUBTOTAL', 'TAX', 'TOTAL_DUE', 'DUE_DATE', 'PAYMENT_INSTRUCTIONS', 'CONTACT_EMAIL', 'CONTACT_PHONE'],
-        isDefault: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+// ============ AUTH ============
 
-    saveTemplates(defaultTemplates);
-    console.log('Default templates initialized');
+function adminAuth(req, res, next) {
+  const token = req.cookies[SESSION_COOKIE];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    jwt.verify(token, SESSION_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Unauthorized' });
   }
 }
 
-// Initialize data
-initializeData();
+const authenticateAdmin = adminAuth;
 
-// Auto-load gallery images from gallery_images folder
-function autoLoadGalleryImages() {
-  try {
-    const galleryImagesDir = path.join(__dirname, 'gallery_images');
-    if (!fs.existsSync(galleryImagesDir)) {
-      console.log('gallery_images directory not found');
-      return;
-    }
-
-    const files = fs.readdirSync(galleryImagesDir);
-    const imageFiles = files.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
-
-    if (imageFiles.length === 0) {
-      console.log('No images found in gallery_images directory');
-      return;
-    }
-
-    // Read existing gallery
-    let gallery = readGallery();
-
-    // If gallery is empty or doesn't have all images, rebuild it
-    if (gallery.length < imageFiles.length) {
-      gallery = imageFiles.map((file, index) => ({
-        id: index + 1,
-        title: file.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '').replace(/-/g, ' ').toUpperCase(),
-        category: 'Gallery',
-        description: 'Sovereign Prints portfolio piece',
-        image: `/gallery_images/${file}`,
-        imageUrl: `/gallery_images/${file}`,
-        active: true,
-        order: index,
-        createdAt: new Date().toISOString()
-      }));
-
-      saveGallery(gallery);
-      console.log(`Gallery auto-loaded with ${imageFiles.length} images`);
-    }
-  } catch (err) {
-    console.error('Error auto-loading gallery images:', err);
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) {
+    return res.status(500).json({ error: 'Admin login is not configured' });
   }
-}
+  if (password === expected) {
+    const token = jwt.sign({ admin: true }, SESSION_SECRET, { expiresIn: '12h' });
+    res.cookie(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction,
+      maxAge: 12 * 60 * 60 * 1000
+    });
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
 
-// Auto-load gallery images on startup
-autoLoadGalleryImages();
+app.post('/api/admin/logout', (req, res) => {
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ success: true });
+});
 
-// ==================== API ROUTES ====================
+app.get('/api/admin/session', adminAuth, (req, res) => {
+  res.json({ authenticated: true });
+});
 
-// Get all active products
-app.get('/api/products', (req, res) => {
+// ============ UPLOADED FILE SERVING ============
+
+app.get('/uploads/:id', async (req, res) => {
   try {
-    const products = readProducts();
-    const category = req.query.category;
-    let filtered = products.filter(p => p.active);
-
-    if (category) {
-      filtered = filtered.filter(p => p.category === category);
+    const { rows } = await db.query('SELECT filename, mimetype, data FROM files WHERE id = $1', [req.params.id]);
+    if (!rows.length) {
+      return res.status(404).end();
     }
-
-    res.json(filtered);
+    res.set('Content-Type', rows[0].mimetype);
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(rows[0].data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get product details with pricing tiers
-app.get('/api/products/:id', (req, res) => {
-  try {
-    const products = readProducts();
-    const product = products.find(p => p.id === parseInt(req.params.id));
+// ============ PRODUCT ROUTES ============
 
-    if (!product) {
+app.get('/api/products', async (req, res) => {
+  try {
+    const category = req.query.category;
+    const params = [];
+    let sql = 'SELECT * FROM products WHERE active = true';
+    if (category) {
+      params.push(category);
+      sql += ` AND category = $${params.length}`;
+    }
+    sql += ' ORDER BY id';
+    const { rows } = await db.query(sql, params);
+    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = ANY($1) ORDER BY quantity_min', [rows.map(r => r.id)]);
+    const tiersByProduct = {};
+    tiersRes.rows.forEach(t => {
+      (tiersByProduct[t.product_id] ||= []).push(t);
+    });
+    res.json(rows.map(r => mapProduct(r, tiersByProduct[r.id])));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM products WHERE id = $1', [parseInt(req.params.id)]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Product not found' });
     }
-
-    res.json(product);
+    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = $1 ORDER BY quantity_min', [rows[0].id]);
+    res.json(mapProduct(rows[0], tiersRes.rows));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get all product categories
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', async (req, res) => {
   try {
-    const products = readProducts();
-    const categories = [...new Set(products.filter(p => p.active).map(p => p.category))].sort();
-    res.json(categories);
+    const { rows } = await db.query('SELECT DISTINCT category FROM products WHERE active = true ORDER BY category');
+    res.json(rows.map(r => r.category));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Submit quote request
-app.post('/api/quotes', (req, res) => {
+// ============ QUOTE ROUTES ============
+
+app.post('/api/quotes', async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, service, description, requirements } = req.body;
     const referenceNumber = 'QT-' + Date.now();
 
-    const quote = {
-      id: Date.now(),
-      referenceNumber,
-      customerName,
-      customerEmail,
-      customerPhone: customerPhone || '',
-      service,
-      description: description || '',
-      requirements: requirements || '',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      respondedAt: null,
-      notes: ''
-    };
-
-    const quotes = readQuotes();
-    quotes.push(quote);
-    saveQuotes(quotes);
+    await db.query(
+      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+      [referenceNumber, customerName, customerEmail, customerPhone || '', service, description || '', requirements || '']
+    );
 
     res.json({
       success: true,
-      referenceNumber: referenceNumber,
+      referenceNumber,
       message: 'Quote request received. We will respond within 24 hours.'
     });
   } catch (err) {
@@ -311,226 +274,231 @@ app.post('/api/quotes', (req, res) => {
   }
 });
 
-// Get quote status
-app.get('/api/quotes/:referenceNumber', (req, res) => {
+app.get('/api/quotes/:referenceNumber', async (req, res) => {
   try {
-    const quotes = readQuotes();
-    const quote = quotes.find(q => q.referenceNumber === req.params.referenceNumber);
-
-    if (!quote) {
+    const { rows } = await db.query('SELECT * FROM quotes WHERE reference_number = $1', [req.params.referenceNumber]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Quote not found' });
     }
-
+    const q = mapQuote(rows[0]);
     res.json({
-      id: quote.id,
-      referenceNumber: quote.referenceNumber,
-      status: quote.status,
-      service: quote.service,
-      createdAt: quote.createdAt,
-      respondedAt: quote.respondedAt
+      id: q.id,
+      referenceNumber: q.referenceNumber,
+      status: q.status,
+      service: q.service,
+      createdAt: q.createdAt,
+      respondedAt: q.respondedAt
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ============ ADMIN ROUTES ============
-
-// Admin login
-app.post('/api/admin/login', (req, res) => {
-  const { password } = req.body;
-  if (password === process.env.ADMIN_PASSWORD || password === 'admin123') {
-    res.json({
-      success: true,
-      token: 'admin-token-' + Date.now()
-    });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
-  }
-});
-
-// Middleware to check admin authentication
-function adminAuth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (token) {
-    next();
-  } else {
-    res.status(401).json({ error: 'Unauthorized' });
-  }
-}
-
-// Alias for consistency with project routes
-const authenticateAdmin = adminAuth;
-
-// Get admin dashboard stats
-app.get('/api/admin/dashboard', adminAuth, (req, res) => {
+app.get('/api/admin/dashboard', adminAuth, async (req, res) => {
   try {
-    const quotes = readQuotes();
-    const products = readProducts();
-    const today = new Date().toISOString().split('T')[0];
-
-    const newToday = quotes.filter(q => q.createdAt.split('T')[0] === today).length;
-    const pending = quotes.filter(q => q.status === 'pending').length;
-    const totalProducts = products.filter(p => p.active).length;
+    const [quoteStats, productStats] = await Promise.all([
+      db.query(`SELECT
+        COUNT(*) FILTER (WHERE created_at::date = now()::date)::int AS new_today,
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
+        FROM quotes`),
+      db.query('SELECT COUNT(*)::int AS count FROM products WHERE active = true')
+    ]);
 
     res.json({
-      newQuotesToday: newToday,
-      pendingQuotes: pending,
-      totalProducts: totalProducts
+      newQuotesToday: quoteStats.rows[0].new_today,
+      pendingQuotes: quoteStats.rows[0].pending,
+      totalProducts: productStats.rows[0].count
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get all quotes (admin)
-app.get('/api/admin/quotes', adminAuth, (req, res) => {
+app.get('/api/admin/quotes', adminAuth, async (req, res) => {
   try {
-    const quotes = readQuotes();
     const status = req.query.status;
-
-    let filtered = quotes;
+    const params = [];
+    let sql = 'SELECT * FROM quotes';
     if (status) {
-      filtered = filtered.filter(q => q.status === status);
+      params.push(status);
+      sql += ` WHERE status = $${params.length}`;
     }
-
-    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(filtered);
+    sql += ' ORDER BY created_at DESC';
+    const { rows } = await db.query(sql, params);
+    res.json(rows.map(mapQuote));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get single quote (admin)
-app.get('/api/admin/quotes/:id', adminAuth, (req, res) => {
+app.get('/api/admin/quotes/:id', adminAuth, async (req, res) => {
   try {
-    const quotes = readQuotes();
-    const quote = quotes.find(q => q.id === parseInt(req.params.id));
-
-    if (!quote) {
+    const { rows } = await db.query('SELECT * FROM quotes WHERE id = $1', [parseInt(req.params.id)]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Quote not found' });
     }
-
-    res.json(quote);
+    res.json(mapQuote(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update quote status (admin)
-app.patch('/api/admin/quotes/:id', adminAuth, (req, res) => {
+app.patch('/api/admin/quotes/:id', adminAuth, async (req, res) => {
   try {
     const { status, notes } = req.body;
-    const quotes = readQuotes();
-    const quote = quotes.find(q => q.id === parseInt(req.params.id));
-
-    if (!quote) {
+    const { rows } = await db.query(
+      `UPDATE quotes SET status = $1, notes = $2, responded_at = now() WHERE id = $3 RETURNING id`,
+      [status, notes || '', parseInt(req.params.id)]
+    );
+    if (!rows.length) {
       return res.status(404).json({ error: 'Quote not found' });
     }
-
-    quote.status = status;
-    quote.notes = notes || '';
-    quote.respondedAt = new Date().toISOString();
-
-    saveQuotes(quotes);
     res.json({ success: true, message: 'Quote updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Create product
-app.post('/api/admin/products', adminAuth, (req, res) => {
+// ============ ADMIN PRODUCT ROUTES ============
+
+app.get('/api/admin/products', adminAuth, async (req, res) => {
   try {
-    const { name, category, basePrice, description, specifications, turnaroundDays } = req.body;
-    const products = readProducts();
-
-    const newProduct = {
-      id: Math.max(...products.map(p => p.id), 0) + 1,
-      name,
-      category,
-      basePrice,
-      description: description || '',
-      specifications: specifications || '',
-      turnaroundDays: turnaroundDays || 5,
-      active: true,
-      pricingTiers: [
-        { id: Date.now(), quantityMin: 1, quantityMax: 10, price: basePrice },
-        { id: Date.now() + 1, quantityMin: 11, quantityMax: 50, price: Math.round(basePrice * 0.9) },
-        { id: Date.now() + 2, quantityMin: 51, quantityMax: 100, price: Math.round(basePrice * 0.8) },
-        { id: Date.now() + 3, quantityMin: 101, quantityMax: null, price: Math.round(basePrice * 0.7) }
-      ]
-    };
-
-    products.push(newProduct);
-    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
-
-    res.json({ success: true, id: newProduct.id });
+    const { rows } = await db.query('SELECT * FROM products ORDER BY id');
+    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = ANY($1) ORDER BY quantity_min', [rows.map(r => r.id)]);
+    const tiersByProduct = {};
+    tiersRes.rows.forEach(t => {
+      (tiersByProduct[t.product_id] ||= []).push(t);
+    });
+    res.json(rows.map(r => mapProduct(r, tiersByProduct[r.id])));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update product
-app.patch('/api/admin/products/:id', adminAuth, (req, res) => {
+app.post('/api/admin/products', adminAuth, upload.single('image'), async (req, res) => {
   try {
-    const { name, category, basePrice, description, specifications, turnaroundDays, active } = req.body;
-    const products = readProducts();
-    const product = products.find(p => p.id === parseInt(req.params.id));
+    const { name, category, basePrice, description, specifications, turnaroundDays } = req.body;
+    const imagePath = req.file ? await saveUploadedFile(req.file) : null;
+    const { rows } = await db.query(
+      `INSERT INTO products (name, category, base_price, description, specifications, turnaround_days, active, image)
+       VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING id`,
+      [name, category, basePrice, description || '', specifications || '', turnaroundDays || 5, imagePath]
+    );
+    const productId = rows[0].id;
 
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+    const tiers = [
+      { min: 1, max: 10, price: basePrice },
+      { min: 11, max: 50, price: Math.round(basePrice * 0.9) },
+      { min: 51, max: 100, price: Math.round(basePrice * 0.8) },
+      { min: 101, max: null, price: Math.round(basePrice * 0.7) }
+    ];
+    for (const t of tiers) {
+      await db.query(
+        'INSERT INTO pricing_tiers (product_id, quantity_min, quantity_max, price) VALUES ($1, $2, $3, $4)',
+        [productId, t.min, t.max, t.price]
+      );
     }
 
-    product.name = name;
-    product.category = category;
-    product.basePrice = basePrice;
-    product.description = description || '';
-    product.specifications = specifications || '';
-    product.turnaroundDays = turnaroundDays || 5;
-    product.active = active !== false;
+    res.json({ success: true, id: productId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
+app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
+  try {
+    const { name, category, basePrice, description, specifications, turnaroundDays, active } = req.body;
+    const { rows } = await db.query(
+      `UPDATE products SET name = $1, category = $2, base_price = $3, description = $4,
+       specifications = $5, turnaround_days = $6, active = $7 WHERE id = $8 RETURNING id`,
+      [name, category, basePrice, description || '', specifications || '', turnaroundDays || 5, active !== false, parseInt(req.params.id)]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     res.json({ success: true, message: 'Product updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete product (soft delete)
-app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
+app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
   try {
-    const products = readProducts();
-    const product = products.find(p => p.id === parseInt(req.params.id));
-
-    if (!product) {
+    const { rows } = await db.query(
+      'UPDATE products SET active = false WHERE id = $1 RETURNING id',
+      [parseInt(req.params.id)]
+    );
+    if (!rows.length) {
       return res.status(404).json({ error: 'Product not found' });
     }
-
-    product.active = false;
-    fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
     res.json({ success: true, message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update pricing tier
-app.patch('/api/admin/pricing/:tierId', adminAuth, (req, res) => {
+app.patch('/api/admin/pricing/:tierId', adminAuth, async (req, res) => {
   try {
     const { price } = req.body;
-    const products = readProducts();
-
-    for (let product of products) {
-      const tier = product.pricingTiers?.find(t => t.id === parseInt(req.params.tierId));
-      if (tier) {
-        tier.price = price;
-        fs.writeFileSync(productsFile, JSON.stringify(products, null, 2));
-        return res.json({ success: true, message: 'Price updated' });
-      }
+    const { rows } = await db.query(
+      'UPDATE pricing_tiers SET price = $1 WHERE id = $2 RETURNING id',
+      [price, parseInt(req.params.tierId)]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Pricing tier not found' });
     }
+    res.json({ success: true, message: 'Price updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    res.status(404).json({ error: 'Pricing tier not found' });
+app.patch('/api/admin/products/:id/image', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const imagePath = await saveUploadedFile(req.file);
+    const { rows } = await db.query(
+      'UPDATE products SET image = $1 WHERE id = $2 RETURNING id',
+      [imagePath, parseInt(req.params.id)]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ success: true, image: imagePath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/upload', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const url = await saveUploadedFile(req.file);
+    res.json({ success: true, url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/product-image', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    const { productId } = req.body;
+    if (!productId || !req.file) {
+      return res.status(400).json({ error: 'Product ID and image required' });
+    }
+    const imagePath = await saveUploadedFile(req.file);
+    const { rows } = await db.query(
+      'UPDATE products SET image = $1 WHERE id = $2 RETURNING id',
+      [imagePath, parseInt(productId)]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ success: true, productId: parseInt(productId), imagePath });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -538,315 +506,217 @@ app.patch('/api/admin/pricing/:tierId', adminAuth, (req, res) => {
 
 // ============ GALLERY ROUTES ============
 
-// Get all gallery items (admin)
-app.get('/api/admin/gallery', adminAuth, (req, res) => {
+app.get('/api/admin/gallery', adminAuth, async (req, res) => {
   try {
-    const gallery = readGallery();
-    res.json(gallery);
+    const { rows } = await db.query('SELECT * FROM gallery ORDER BY display_order');
+    res.json(rows.map(mapGallery));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Upload gallery image
-app.post('/api/admin/gallery', adminAuth, upload.single('image'), (req, res) => {
+app.post('/api/admin/gallery', adminAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-
     const { title, category, description } = req.body;
-    const filename = Date.now() + path.extname(req.file.originalname);
-    const filepath = path.join('uploads', filename);
-    fs.renameSync(req.file.path, filepath);
+    const imageUrl = await saveUploadedFile(req.file);
 
-    const gallery = readGallery();
-    const newItem = {
-      id: Date.now(),
-      title: title || 'Untitled',
-      category: category || 'General',
-      description: description || '',
-      imageUrl: `/uploads/${filename}`,
-      active: true,
-      createdAt: new Date().toISOString()
-    };
+    const { rows: maxOrderRows } = await db.query('SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM gallery');
+    const { rows } = await db.query(
+      `INSERT INTO gallery (title, category, description, image_url, active, display_order)
+       VALUES ($1, $2, $3, $4, true, $5) RETURNING *`,
+      [title || 'Untitled', category || 'General', description || '', imageUrl, maxOrderRows[0].next_order]
+    );
 
-    gallery.push(newItem);
-    saveGallery(gallery);
-
-    res.json({ success: true, item: newItem });
+    res.json({ success: true, item: mapGallery(rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update gallery item
-app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), (req, res) => {
+app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), async (req, res) => {
   try {
     const { title, category, description, active } = req.body;
-    const gallery = readGallery();
-    const item = gallery.find(g => g.id === parseInt(req.params.id));
+    const id = parseInt(req.params.id);
 
-    if (!item) {
+    const { rows: existingRows } = await db.query('SELECT * FROM gallery WHERE id = $1', [id]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Gallery item not found' });
     }
+    const existing = existingRows[0];
 
-    // Update image if a new one was uploaded
+    let imageUrl = existing.image_url;
     if (req.file) {
-      const filename = Date.now() + path.extname(req.file.originalname);
-      const filepath = path.join('uploads', filename);
-      fs.renameSync(req.file.path, filepath);
-      item.imageUrl = `/uploads/${filename}`;
+      imageUrl = await saveUploadedFile(req.file);
     }
 
-    // Update other fields
-    if (title) item.title = title;
-    if (category) item.category = category;
-    if (description !== undefined) item.description = description;
-    if (active !== undefined) item.active = active === 'true' || active === true;
+    const { rows } = await db.query(
+      `UPDATE gallery SET title = $1, category = $2, description = $3, active = $4, image_url = $5 WHERE id = $6 RETURNING *`,
+      [
+        title || existing.title,
+        category || existing.category,
+        description !== undefined ? description : existing.description,
+        active !== undefined ? (active === 'true' || active === true) : existing.active,
+        imageUrl,
+        id
+      ]
+    );
 
-    saveGallery(gallery);
-    res.json({ success: true, item });
+    res.json({ success: true, item: mapGallery(rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete gallery item
-app.delete('/api/admin/gallery/:id', adminAuth, (req, res) => {
+app.delete('/api/admin/gallery/:id', adminAuth, async (req, res) => {
   try {
-    let gallery = readGallery();
-    const itemIndex = gallery.findIndex(g => g.id === parseInt(req.params.id));
-
-    if (itemIndex === -1) {
+    const { rows } = await db.query('DELETE FROM gallery WHERE id = $1 RETURNING id', [parseInt(req.params.id)]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Gallery item not found' });
     }
-
-    gallery.splice(itemIndex, 1);
-    saveGallery(gallery);
     res.json({ success: true, message: 'Gallery item deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Upload product image
-app.post('/api/admin/upload', adminAuth, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    res.status(400).json({ error: 'No file uploaded' });
-  } else {
-    const filename = Date.now() + path.extname(req.file.originalname);
-    const filepath = path.join('uploads', filename);
-    fs.renameSync(req.file.path, filepath);
-    res.json({
-      success: true,
-      filename: filename,
-      url: `/uploads/${filename}`
-    });
-  }
-});
-
-// ============ PRODUCT IMAGE ENDPOINTS ============
-
-// Upload image for specific product
-app.post('/api/admin/product-image', adminAuth, upload.single('image'), (req, res) => {
+app.get('/api/gallery', async (req, res) => {
   try {
-    const { productId } = req.body;
-
-    if (!productId || !req.file) {
-      return res.status(400).json({ error: 'Product ID and image required' });
-    }
-
-    const products = readProducts();
-    const product = products.find(p => p.id === parseInt(productId));
-
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    // Save uploaded file
-    const filename = Date.now() + path.extname(req.file.originalname);
-    const filepath = path.join('uploads', filename);
-    fs.renameSync(req.file.path, filepath);
-
-    // Update product with image path
-    product.image = `/uploads/${filename}`;
-    saveProducts(products);
-
-    res.json({
-      success: true,
-      productId: product.id,
-      imagePath: product.image
-    });
+    const { rows } = await db.query('SELECT * FROM gallery WHERE active = true ORDER BY display_order');
+    res.json(rows.map(mapGallery));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ============ TEMPLATE MANAGEMENT ENDPOINTS ============
+// ============ TEMPLATE MANAGEMENT ROUTES ============
 
-// Get all templates
-app.get('/api/admin/templates', adminAuth, (req, res) => {
+app.get('/api/admin/templates', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    res.json(templates);
+    const { rows } = await db.query('SELECT * FROM templates ORDER BY created_at');
+    res.json(rows.map(mapTemplate));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get single template
-app.get('/api/admin/templates/:id', adminAuth, (req, res) => {
+app.get('/api/admin/templates/:id', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    const template = templates.find(t => t.id === req.params.id);
-    if (!template) {
+    const { rows } = await db.query('SELECT * FROM templates WHERE id = $1', [req.params.id]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Template not found' });
     }
-    res.json(template);
+    res.json(mapTemplate(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get templates by type
-app.get('/api/admin/templates/type/:type', adminAuth, (req, res) => {
+app.get('/api/admin/templates/type/:type', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    const filtered = templates.filter(t => t.type === req.params.type);
-    res.json(filtered);
+    const { rows } = await db.query('SELECT * FROM templates WHERE type = $1', [req.params.type]);
+    res.json(rows.map(mapTemplate));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Create new template
-app.post('/api/admin/templates', adminAuth, (req, res) => {
+app.post('/api/admin/templates', adminAuth, async (req, res) => {
   try {
     const { name, type, description, content } = req.body;
-
     if (!name || !type || !content) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const templates = loadTemplates();
-    const newTemplate = {
-      id: `template-${Date.now()}`,
-      name,
-      type,
-      description: description || '',
-      content,
-      placeholders: extractPlaceholders(content),
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const id = `template-${Date.now()}`;
+    const placeholders = extractPlaceholders(content);
+    const { rows } = await db.query(
+      `INSERT INTO templates (id, name, type, description, content, placeholders, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING *`,
+      [id, name, type, description || '', content, JSON.stringify(placeholders)]
+    );
 
-    templates.push(newTemplate);
-    saveTemplates(templates);
-
-    res.status(201).json(newTemplate);
+    res.status(201).json(mapTemplate(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update template
-app.patch('/api/admin/templates/:id', adminAuth, (req, res) => {
+app.patch('/api/admin/templates/:id', adminAuth, async (req, res) => {
   try {
     const { name, description, content } = req.body;
-    const templates = loadTemplates();
-    const template = templates.find(t => t.id === req.params.id);
-
-    if (!template) {
+    const { rows: existingRows } = await db.query('SELECT * FROM templates WHERE id = $1', [req.params.id]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Template not found' });
     }
+    const existing = existingRows[0];
 
-    // Don't allow editing default templates
-    if (template.isDefault && !req.body.allowEditDefault) {
+    if (existing.is_default && !req.body.allowEditDefault) {
       return res.status(403).json({ error: 'Cannot edit default templates' });
     }
 
-    if (name) template.name = name;
-    if (description !== undefined) template.description = description;
-    if (content) {
-      template.content = content;
-      template.placeholders = extractPlaceholders(content);
-    }
-    template.updatedAt = new Date().toISOString();
+    const newContent = content || existing.content;
+    const placeholders = content ? extractPlaceholders(content) : existing.placeholders;
 
-    saveTemplates(templates);
-    res.json(template);
+    const { rows } = await db.query(
+      `UPDATE templates SET name = $1, description = $2, content = $3, placeholders = $4, updated_at = now() WHERE id = $5 RETURNING *`,
+      [name || existing.name, description !== undefined ? description : existing.description, newContent, JSON.stringify(placeholders), req.params.id]
+    );
+
+    res.json(mapTemplate(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete template
-app.delete('/api/admin/templates/:id', adminAuth, (req, res) => {
+app.delete('/api/admin/templates/:id', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    const template = templates.find(t => t.id === req.params.id);
-
-    if (!template) {
+    const { rows: existingRows } = await db.query('SELECT is_default FROM templates WHERE id = $1', [req.params.id]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Template not found' });
     }
-
-    // Don't allow deleting default templates
-    if (template.isDefault) {
+    if (existingRows[0].is_default) {
       return res.status(403).json({ error: 'Cannot delete default templates' });
     }
 
-    const filtered = templates.filter(t => t.id !== req.params.id);
-    saveTemplates(filtered);
-
+    await db.query('DELETE FROM templates WHERE id = $1', [req.params.id]);
     res.json({ success: true, message: 'Template deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Set template as default for its type
-app.patch('/api/admin/templates/:id/set-default', adminAuth, (req, res) => {
+app.patch('/api/admin/templates/:id/set-default', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    const template = templates.find(t => t.id === req.params.id);
-
-    if (!template) {
+    const { rows: existingRows } = await db.query('SELECT type FROM templates WHERE id = $1', [req.params.id]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Template not found' });
     }
 
-    // Unset previous default for this type
-    templates.forEach(t => {
-      if (t.type === template.type && t.id !== template.id) {
-        t.isDefault = false;
-      }
-    });
+    await db.query('UPDATE templates SET is_default = false WHERE type = $1 AND id != $2', [existingRows[0].type, req.params.id]);
+    const { rows } = await db.query(
+      'UPDATE templates SET is_default = true, updated_at = now() WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
 
-    template.isDefault = true;
-    template.updatedAt = new Date().toISOString();
-    saveTemplates(templates);
-
-    res.json(template);
+    res.json(mapTemplate(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Generate template with data
-app.post('/api/admin/templates/:id/generate', adminAuth, (req, res) => {
+app.post('/api/admin/templates/:id/generate', adminAuth, async (req, res) => {
   try {
-    const templates = loadTemplates();
-    const template = templates.find(t => t.id === req.params.id);
-
-    if (!template) {
+    const { rows } = await db.query('SELECT * FROM templates WHERE id = $1', [req.params.id]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Template not found' });
     }
+    const template = mapTemplate(rows[0]);
 
     let output = template.content;
     const data = req.body || {};
-
-    // Replace placeholders with data
     template.placeholders.forEach(placeholder => {
       const value = data[placeholder] || `[${placeholder}]`;
       const regex = new RegExp(`{{${placeholder}}}`, 'g');
@@ -859,84 +729,51 @@ app.post('/api/admin/templates/:id/generate', adminAuth, (req, res) => {
   }
 });
 
-// ============ PUBLIC GALLERY ENDPOINT ============
+// ============ PROJECT TRACKING ROUTES ============
 
-// Get active gallery items (public)
-app.get('/api/gallery', (req, res) => {
+app.get('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
-    const gallery = readGallery();
-    // Filter to active items and use 'image' field instead of 'imageUrl'
-    const activeGallery = gallery
-      .filter(item => item.active !== false)
-      .map(item => ({
-        ...item,
-        image: item.image || item.imageUrl  // Support both field names
-      }))
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-    res.json(activeGallery);
+    const { rows } = await db.query('SELECT * FROM projects ORDER BY created_at DESC');
+    res.json({ projects: rows.map(mapProject) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============ PROJECT TRACKING ENDPOINTS ============
-
-// Initialize projects data
-function initializeProjectsData() {
-  if (!fs.existsSync(projectsFile)) {
-    fs.writeFileSync(projectsFile, JSON.stringify({ projects: [] }, null, 2));
-    console.log('Projects data initialized');
-  }
-}
-
-// Load projects from file
-function loadProjects() {
-  try {
-    const data = fs.readFileSync(projectsFile, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error loading projects:', error);
-    return { projects: [] };
-  }
-}
-
-// Save projects to file
-function saveProjects(data) {
-  try {
-    fs.writeFileSync(projectsFile, JSON.stringify(data, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Error saving projects:', error);
-    return false;
-  }
-}
-
-// Get all projects (admin only)
-app.get('/api/admin/projects', authenticateAdmin, (req, res) => {
-  try {
-    const data = loadProjects();
-    data.projects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(data);
-  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch projects' });
   }
 });
 
-// Get single project by ID (admin only)
-app.get('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+app.get('/api/admin/projects/stats/overview', authenticateAdmin, async (req, res) => {
   try {
-    const data = loadProjects();
-    const project = data.projects.find(p => p.id === parseInt(req.params.id));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json({ project });
-  } catch (error) {
+    const { rows } = await db.query('SELECT status, due_date FROM projects');
+    const today = new Date().toISOString().split('T')[0];
+    const stats = {
+      total: rows.length,
+      quoted: rows.filter(p => p.status === 'quoted').length,
+      processing: rows.filter(p => p.status === 'processing').length,
+      complete: rows.filter(p => p.status === 'complete').length,
+      delivered: rows.filter(p => p.status === 'delivered').length,
+      onHold: rows.filter(p => p.status === 'on-hold').length,
+      cancelled: rows.filter(p => p.status === 'cancelled').length,
+      overdue: rows.filter(p => {
+        const due = p.due_date instanceof Date ? p.due_date.toISOString().split('T')[0] : p.due_date;
+        return due < today && !['complete', 'delivered', 'cancelled'].includes(p.status);
+      }).length
+    };
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch project statistics' });
+  }
+});
+
+app.get('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM projects WHERE id = $1', [parseInt(req.params.id)]);
+    if (!rows.length) return res.status(404).json({ error: 'Project not found' });
+    res.json({ project: mapProject(rows[0]) });
+  } catch (err) {
     res.status(500).json({ error: 'Failed to fetch project' });
   }
 });
 
-// Create new project (admin only)
-app.post('/api/admin/projects', authenticateAdmin, (req, res) => {
+app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
     const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes } = req.body;
 
@@ -944,158 +781,164 @@ app.post('/api/admin/projects', authenticateAdmin, (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const data = loadProjects();
-    const newProject = {
-      id: Date.now(),
-      projectName: projectName.trim(),
-      customerName: customerName.trim(),
-      customerEmail: customerEmail?.trim() || '',
-      customerPhone: customerPhone?.trim() || '',
-      serviceType: serviceType || 'General',
-      description: description?.trim() || '',
-      quotedPrice: quotedPrice?.trim() || '',
-      dueDate,
-      status: status.toLowerCase(),
-      notes: notes?.trim() || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const id = Date.now();
+    const { rows } = await db.query(
+      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        id,
+        projectName.trim(),
+        customerName.trim(),
+        customerEmail?.trim() || '',
+        customerPhone?.trim() || '',
+        serviceType || 'General',
+        description?.trim() || '',
+        quotedPrice?.trim() || '',
+        dueDate,
+        status.toLowerCase(),
+        notes?.trim() || ''
+      ]
+    );
 
-    data.projects.push(newProject);
-    if (saveProjects(data)) {
-      res.json({ success: true, project: newProject, message: `Project "${projectName}" created successfully` });
-    } else {
-      res.status(500).json({ error: 'Failed to save project' });
-    }
+    const project = mapProject(rows[0]);
+    res.json({ success: true, project, message: `Project "${projectName}" created successfully` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create project' });
   }
 });
 
-// Update project (admin only)
-app.patch('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+app.patch('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const updates = req.body;
 
-    const data = loadProjects();
-    const projectIndex = data.projects.findIndex(p => p.id === projectId);
-
-    if (projectIndex === -1) {
+    const { rows: existingRows } = await db.query('SELECT * FROM projects WHERE id = $1', [projectId]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Project not found' });
     }
+    const existing = existingRows[0];
 
-    const allowedFields = ['projectName', 'customerName', 'customerEmail', 'customerPhone', 'serviceType', 'description', 'quotedPrice', 'dueDate', 'status', 'notes'];
-    allowedFields.forEach(field => {
-      if (updates.hasOwnProperty(field)) {
-        data.projects[projectIndex][field] = typeof updates[field] === 'string' ? updates[field].trim() : updates[field];
+    const fieldMap = {
+      projectName: 'project_name',
+      customerName: 'customer_name',
+      customerEmail: 'customer_email',
+      customerPhone: 'customer_phone',
+      serviceType: 'service_type',
+      description: 'description',
+      quotedPrice: 'quoted_price',
+      dueDate: 'due_date',
+      status: 'status',
+      notes: 'notes'
+    };
+
+    const merged = {};
+    Object.keys(fieldMap).forEach(apiField => {
+      const column = fieldMap[apiField];
+      const dbKey = column;
+      const currentValue = existing[dbKey];
+      if (updates.hasOwnProperty(apiField)) {
+        merged[column] = typeof updates[apiField] === 'string' ? updates[apiField].trim() : updates[apiField];
+      } else {
+        merged[column] = currentValue;
       }
     });
 
-    data.projects[projectIndex].updatedAt = new Date().toISOString();
+    const { rows } = await db.query(
+      `UPDATE projects SET project_name = $1, customer_name = $2, customer_email = $3, customer_phone = $4,
+       service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10, updated_at = now()
+       WHERE id = $11 RETURNING *`,
+      [
+        merged.project_name, merged.customer_name, merged.customer_email, merged.customer_phone,
+        merged.service_type, merged.description, merged.quoted_price, merged.due_date, merged.status, merged.notes,
+        projectId
+      ]
+    );
 
-    if (saveProjects(data)) {
-      res.json({ success: true, project: data.projects[projectIndex], message: 'Project updated successfully' });
-    } else {
-      res.status(500).json({ error: 'Failed to save project' });
-    }
+    res.json({ success: true, project: mapProject(rows[0]), message: 'Project updated successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update project' });
   }
 });
 
-// Update project status only (admin only)
-app.patch('/api/admin/projects/:id/status', authenticateAdmin, (req, res) => {
+app.patch('/api/admin/projects/:id/status', authenticateAdmin, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const { status, notes } = req.body;
-
     if (!status) return res.status(400).json({ error: 'Status is required' });
 
-    const data = loadProjects();
-    const projectIndex = data.projects.findIndex(p => p.id === projectId);
-
-    if (projectIndex === -1) {
+    const { rows: existingRows } = await db.query('SELECT notes FROM projects WHERE id = $1', [projectId]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    data.projects[projectIndex].status = status.toLowerCase();
-    if (notes) data.projects[projectIndex].notes = notes;
-    data.projects[projectIndex].updatedAt = new Date().toISOString();
+    const { rows } = await db.query(
+      'UPDATE projects SET status = $1, notes = $2, updated_at = now() WHERE id = $3 RETURNING *',
+      [status.toLowerCase(), notes || existingRows[0].notes, projectId]
+    );
 
-    if (saveProjects(data)) {
-      res.json({ success: true, project: data.projects[projectIndex], message: `Project status changed to ${status}` });
-    } else {
-      res.status(500).json({ error: 'Failed to save project' });
-    }
+    res.json({ success: true, project: mapProject(rows[0]), message: `Project status changed to ${status}` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update project status' });
   }
 });
 
-// Delete project (admin only)
-app.delete('/api/admin/projects/:id', authenticateAdmin, (req, res) => {
+app.delete('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.id);
-    const data = loadProjects();
-    const projectIndex = data.projects.findIndex(p => p.id === projectId);
-
-    if (projectIndex === -1) {
+    const { rows } = await db.query('DELETE FROM projects WHERE id = $1 RETURNING project_name', [parseInt(req.params.id)]);
+    if (!rows.length) {
       return res.status(404).json({ error: 'Project not found' });
     }
-
-    const deletedProject = data.projects[projectIndex];
-    data.projects.splice(projectIndex, 1);
-
-    if (saveProjects(data)) {
-      res.json({ success: true, message: `Project "${deletedProject.projectName}" deleted successfully` });
-    } else {
-      res.status(500).json({ error: 'Failed to delete project' });
-    }
+    res.json({ success: true, message: `Project "${rows[0].project_name}" deleted successfully` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete project' });
   }
 });
 
-// Get project statistics (admin only)
-app.get('/api/admin/projects/stats/overview', authenticateAdmin, (req, res) => {
-  try {
-    const data = loadProjects();
-    const projects = data.projects;
-    const today = new Date().toISOString().split('T')[0];
-
-    const stats = {
-      total: projects.length,
-      quoted: projects.filter(p => p.status === 'quoted').length,
-      processing: projects.filter(p => p.status === 'processing').length,
-      complete: projects.filter(p => p.status === 'complete').length,
-      delivered: projects.filter(p => p.status === 'delivered').length,
-      onHold: projects.filter(p => p.status === 'on-hold').length,
-      cancelled: projects.filter(p => p.status === 'cancelled').length,
-      overdue: projects.filter(p => {
-        return p.dueDate < today && !['complete', 'delivered', 'cancelled'].includes(p.status);
-      }).length
-    };
-
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch project statistics' });
-  }
-});
-
-// Serve uploaded files
-app.use('/uploads', express.static('uploads'));
-
-// Serve gallery images
+// Serve pre-packaged sample images committed to the repo
 app.use('/gallery_images', express.static('gallery_images'));
-
-// Serve product images
 app.use('/products_images', express.static('products_images'));
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Sovereign Prints server running on port ${PORT}`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin`);
+// ============ STARTUP ============
+
+async function autoLoadGalleryImages() {
+  try {
+    const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM gallery');
+    if (rows[0].count > 0) return;
+
+    const galleryImagesDir = path.join(__dirname, 'gallery_images');
+    if (!fs.existsSync(galleryImagesDir)) return;
+
+    const files = fs.readdirSync(galleryImagesDir).filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
+    if (files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const title = file.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '').replace(/-/g, ' ').toUpperCase();
+      await db.query(
+        `INSERT INTO gallery (title, category, description, image_url, active, display_order)
+         VALUES ($1, 'Gallery', 'Sovereign Prints portfolio piece', $2, true, $3)`,
+        [title, `/gallery_images/${file}`, i]
+      );
+    }
+    console.log(`Gallery auto-loaded with ${files.length} images`);
+  } catch (err) {
+    console.error('Error auto-loading gallery images:', err);
+  }
+}
+
+async function start() {
+  await db.initSchema();
+  await autoLoadGalleryImages();
+
+  app.listen(PORT, () => {
+    console.log(`Sovereign Prints server running on port ${PORT}`);
+    console.log(`Admin panel: http://localhost:${PORT}/admin`);
+  });
+}
+
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 module.exports = app;
