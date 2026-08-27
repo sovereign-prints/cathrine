@@ -83,16 +83,30 @@ async function getProduct(id) {
   }
 }
 
-async function submitQuote(quoteData) {
+// Attachments, when present, force a multipart request; without them the plain
+// JSON body is used exactly as before.
+async function submitQuote(quoteData, attachments) {
   try {
-    const response = await fetch(`${API_BASE}/quotes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(quoteData)
-    });
-    return await response.json();
+    let options;
+    if (attachments && attachments.length) {
+      const form = new FormData();
+      Object.entries(quoteData).forEach(([key, value]) => form.append(key, value ?? ''));
+      attachments.forEach(file => form.append('attachments', file));
+      options = { method: 'POST', body: form };
+    } else {
+      options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteData)
+      };
+    }
+
+    const response = await fetch(`${API_BASE}/quotes`, options);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Server error');
+    }
+    return data;
   } catch (error) {
     console.error('Error submitting quote:', error);
     throw error;

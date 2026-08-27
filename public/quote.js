@@ -36,6 +36,7 @@ function setupQuoteForm() {
   }
 
   console.log('Quote form initialized');
+  setupAttachmentPreview();
 
   quoteForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -62,10 +63,16 @@ function setupQuoteForm() {
       return;
     }
 
+    const attachments = getSelectedAttachments();
+    if (attachments.length > 8) {
+      alert('Please attach no more than 8 images.');
+      return;
+    }
+
     console.log('Form validation passed, submitting...');
 
     try {
-      const response = await submitQuote(formData);
+      const response = await submitQuote(formData, attachments);
       console.log('Quote submission response:', response);
 
       if (response.success) {
@@ -93,6 +100,35 @@ function setupQuoteForm() {
       console.error('Error stack:', error.stack);
       alert('Error submitting quote. Please try again or contact us directly.\n\nError: ' + error.message);
     }
+  });
+}
+
+// ============ IMAGE ATTACHMENTS ============
+
+function getSelectedAttachments() {
+  const input = document.getElementById('attachments');
+  return input && input.files ? Array.from(input.files) : [];
+}
+
+// Show the customer thumbnails of what they picked, so they can spot a wrong file.
+function setupAttachmentPreview() {
+  const input = document.getElementById('attachments');
+  const preview = document.getElementById('attachmentPreview');
+  if (!input || !preview) return;
+
+  input.addEventListener('change', () => {
+    preview.innerHTML = '';
+    getSelectedAttachments().forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.alt = file.name;
+        img.title = file.name;
+        preview.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
   });
 }
 

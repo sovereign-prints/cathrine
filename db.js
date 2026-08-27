@@ -15,24 +15,24 @@ async function query(text, params) {
 
 const DEFAULT_PRODUCTS = [
   // Clothing
-  { name: 'T-Shirt Printing', category: 'Clothing', basePrice: 120, description: 'Custom branded T-shirts for businesses and events', specifications: 'Various sizes, single or multi-color prints', turnaroundDays: 5, image: '/products_images/products-01-Shirt1.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 120 }, { quantityMin: 11, quantityMax: 50, price: 108 }, { quantityMin: 51, quantityMax: 100, price: 96 }, { quantityMin: 101, quantityMax: null, price: 84 }] },
-  { name: 'Hoodie Printing', category: 'Clothing', basePrice: 250, description: 'Premium branded hoodies', specifications: 'Unisex fit, durable printing', turnaroundDays: 5, image: '/products_images/products-01-hoodie.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 250 }, { quantityMin: 11, quantityMax: 50, price: 225 }, { quantityMin: 51, quantityMax: 100, price: 200 }, { quantityMin: 101, quantityMax: null, price: 175 }] },
-  { name: 'Cap Branding', category: 'Clothing', basePrice: 85, description: 'Custom branded caps', specifications: 'Adjustable or structured', turnaroundDays: 5, image: '/products_images/products-01-cap.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 85 }, { quantityMin: 11, quantityMax: 50, price: 76 }, { quantityMin: 51, quantityMax: 100, price: 68 }, { quantityMin: 101, quantityMax: null, price: 59 }] },
+  { name: 'T-Shirt Printing', category: 'Clothing', basePrice: 120, description: 'Custom branded T-shirts for businesses and events', specifications: 'Various sizes, single or multi-color prints', turnaroundDays: 5, image: '/products_images/products-01-Shirt1.jpg' },
+  { name: 'Hoodie Printing', category: 'Clothing', basePrice: 250, description: 'Premium branded hoodies', specifications: 'Unisex fit, durable printing', turnaroundDays: 5, image: '/products_images/products-01-hoodie.jpg' },
+  { name: 'Cap Branding', category: 'Clothing', basePrice: 85, description: 'Custom branded caps', specifications: 'Adjustable or structured', turnaroundDays: 5, image: '/products_images/products-01-cap.jpg' },
   // Vinyl
-  { name: 'Vinyl Decals', category: 'Vinyl', basePrice: 150, description: 'Custom vinyl decals for any surface', specifications: 'Die-cut or standard shapes', turnaroundDays: 5, image: '/products_images/products-01-sticker.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 150 }, { quantityMin: 11, quantityMax: 50, price: 135 }, { quantityMin: 51, quantityMax: 100, price: 120 }, { quantityMin: 101, quantityMax: null, price: 105 }] },
-  { name: 'Wall Graphics', category: 'Vinyl', basePrice: 500, description: 'Large-scale wall decals', specifications: 'Custom sizes, easy application', turnaroundDays: 5, image: '/products_images/products-01-shirt2.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 500 }, { quantityMin: 11, quantityMax: 50, price: 450 }, { quantityMin: 51, quantityMax: 100, price: 400 }, { quantityMin: 101, quantityMax: null, price: 350 }] },
+  { name: 'Vinyl Decals', category: 'Vinyl', basePrice: 150, description: 'Custom vinyl decals for any surface', specifications: 'Die-cut or standard shapes', turnaroundDays: 5, image: '/products_images/products-01-sticker.jpg' },
+  { name: 'Wall Graphics', category: 'Vinyl', basePrice: 500, description: 'Large-scale wall decals', specifications: 'Custom sizes, easy application', turnaroundDays: 5, image: '/products_images/products-01-shirt2.jpg' },
   // Vehicle Branding
-  { name: 'Full Vehicle Wrap', category: 'Vehicle Branding', basePrice: 5000, description: 'Complete vehicle branding', specifications: 'Includes design consultation', turnaroundDays: 5, image: '/products_images/products-01-shirt3.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 5000 }] },
-  { name: 'Partial Wrap', category: 'Vehicle Branding', basePrice: 2500, description: 'Partial vehicle branding', specifications: 'Hood, doors, or side panels', turnaroundDays: 5, image: '/products_images/products-01-shirt4.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 2500 }] },
+  { name: 'Full Vehicle Wrap', category: 'Vehicle Branding', basePrice: 5000, description: 'Complete vehicle branding', specifications: 'Includes design consultation', turnaroundDays: 5, image: '/products_images/products-01-shirt3.jpg' },
+  { name: 'Partial Wrap', category: 'Vehicle Branding', basePrice: 2500, description: 'Partial vehicle branding', specifications: 'Hood, doors, or side panels', turnaroundDays: 5, image: '/products_images/products-01-shirt4.jpg' },
   // Glass & Mugs
-  { name: 'Printed Mug', category: 'Glass & Mugs', basePrice: 95, description: 'Custom printed mugs', specifications: '11oz ceramic mugs', turnaroundDays: 5, image: '/products_images/products-01-mug.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 95 }, { quantityMin: 11, quantityMax: 50, price: 85 }, { quantityMin: 51, quantityMax: 100, price: 76 }, { quantityMin: 101, quantityMax: null, price: 66 }] },
-  { name: 'Printed Glass', category: 'Glass & Mugs', basePrice: 120, description: 'Custom printed glasses', specifications: 'Various sizes available', turnaroundDays: 5, image: '/products_images/products-01-glass.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 120 }, { quantityMin: 11, quantityMax: 50, price: 108 }, { quantityMin: 51, quantityMax: 100, price: 96 }, { quantityMin: 101, quantityMax: null, price: 84 }] },
+  { name: 'Printed Mug', category: 'Glass & Mugs', basePrice: 95, description: 'Custom printed mugs', specifications: '11oz ceramic mugs', turnaroundDays: 5, image: '/products_images/products-01-mug.jpg' },
+  { name: 'Printed Glass', category: 'Glass & Mugs', basePrice: 120, description: 'Custom printed glasses', specifications: 'Various sizes available', turnaroundDays: 5, image: '/products_images/products-01-glass.jpg' },
   // Signage
-  { name: 'Indoor Signage', category: 'Signage', basePrice: 800, description: 'Indoor business signage', specifications: 'Custom design and installation', turnaroundDays: 5, image: '/products_images/products-01-Shirt1.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 800 }] },
-  { name: 'Outdoor Signs', category: 'Signage', basePrice: 1200, description: 'Weather-resistant outdoor signs', specifications: 'Durable materials, UV protected', turnaroundDays: 5, image: '/products_images/products-01-hoodie.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 1200 }] },
+  { name: 'Indoor Signage', category: 'Signage', basePrice: 800, description: 'Indoor business signage', specifications: 'Custom design and installation', turnaroundDays: 5, image: '/products_images/products-01-Shirt1.jpg' },
+  { name: 'Outdoor Signs', category: 'Signage', basePrice: 1200, description: 'Weather-resistant outdoor signs', specifications: 'Durable materials, UV protected', turnaroundDays: 5, image: '/products_images/products-01-hoodie.jpg' },
   // Printing
-  { name: 'Business Cards', category: 'Printing', basePrice: 350, description: 'Professional business cards', specifications: '250 units, 300gsm cardstock', turnaroundDays: 5, image: '/products_images/products-01-cap.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 350 }, { quantityMin: 11, quantityMax: 50, price: 315 }, { quantityMin: 51, quantityMax: 100, price: 280 }, { quantityMin: 101, quantityMax: null, price: 245 }] },
-  { name: 'Flyers & Brochures', category: 'Printing', basePrice: 400, description: 'Marketing flyers and brochures', specifications: 'A5 or A4 size, full color', turnaroundDays: 5, image: '/products_images/products-01-sticker.jpg', pricingTiers: [{ quantityMin: 1, quantityMax: 10, price: 400 }, { quantityMin: 11, quantityMax: 50, price: 360 }, { quantityMin: 51, quantityMax: 100, price: 320 }, { quantityMin: 101, quantityMax: null, price: 280 }] }
+  { name: 'Business Cards', category: 'Printing', basePrice: 350, description: 'Professional business cards', specifications: '250 units, 300gsm cardstock', turnaroundDays: 5, image: '/products_images/products-01-cap.jpg' },
+  { name: 'Flyers & Brochures', category: 'Printing', basePrice: 400, description: 'Marketing flyers and brochures', specifications: 'A5 or A4 size, full color', turnaroundDays: 5, image: '/products_images/products-01-sticker.jpg' }
 ];
 
 const DEFAULT_TEMPLATES = [
@@ -141,24 +141,110 @@ async function initSchema() {
     );
   `);
 
-  const { rows } = await query('SELECT COUNT(*)::int AS count FROM products');
-  if (rows[0].count === 0) {
-    for (const p of DEFAULT_PRODUCTS) {
-      const result = await query(
-        `INSERT INTO products (name, category, base_price, description, specifications, turnaround_days, active, image)
-         VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING id`,
-        [p.name, p.category, p.basePrice, p.description, p.specifications, p.turnaroundDays, p.image]
+  // Quotes carry structured line items so a quote can be edited (and re-priced)
+  // before it is turned into an order. Orders remember the quote they came from.
+  await query(`
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS line_items JSONB DEFAULT '[]';
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS tax NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS total NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS valid_until DATE;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS quote_id INTEGER;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_note TEXT DEFAULT '';
+  `);
+
+  // Pricing is driven by print size (A5 from R50, A4 from R100, ...), not by
+  // quantity. The legacy pricing_tiers table is left in place so nothing is
+  // destroyed, but nothing reads from it any more.
+  await query(`
+    CREATE TABLE IF NOT EXISTS product_sizes (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      size_label TEXT NOT NULL,
+      start_price NUMERIC NOT NULL,
+      display_order INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS product_images (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      image_url TEXT NOT NULL,
+      display_order INTEGER DEFAULT 0
+    );
+  `);
+
+  await seedDefaultProducts();
+  await seedDefaultTemplates();
+  await backfillProductImages();
+  await seedProductSizes();
+}
+
+const DEFAULT_PRICING_NOTE =
+  'Prices are a starting point per print. The level of detail, colour coverage and material of your artwork influence the final cost — send us your design for an exact quote.';
+
+// The two sizes the business quotes from. Everything else is added per product
+// in the admin Pricing tab rather than guessed here.
+const DEFAULT_SIZES = [
+  { label: 'A5', price: 50 },
+  { label: 'A4', price: 100 }
+];
+
+// Products used to hold a single image column; move those into the gallery
+// table so new pictures can be added alongside them instead of replacing them.
+async function backfillProductImages() {
+  await query(`
+    INSERT INTO product_images (product_id, image_url, display_order)
+    SELECT p.id, p.image, 0
+    FROM products p
+    WHERE p.image IS NOT NULL
+      AND p.image <> ''
+      AND NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = p.id)
+  `);
+}
+
+async function seedProductSizes() {
+  const { rows } = await query(`
+    SELECT p.id FROM products p
+    WHERE NOT EXISTS (SELECT 1 FROM product_sizes s WHERE s.product_id = p.id)
+  `);
+
+  for (const product of rows) {
+    for (let i = 0; i < DEFAULT_SIZES.length; i++) {
+      await query(
+        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order) VALUES ($1, $2, $3, $4)',
+        [product.id, DEFAULT_SIZES[i].label, DEFAULT_SIZES[i].price, i]
       );
-      const productId = result.rows[0].id;
-      for (const t of p.pricingTiers) {
-        await query(
-          `INSERT INTO pricing_tiers (product_id, quantity_min, quantity_max, price) VALUES ($1, $2, $3, $4)`,
-          [productId, t.quantityMin, t.quantityMax, t.price]
-        );
-      }
     }
   }
 
+  await query(
+    `UPDATE products SET pricing_note = $1 WHERE pricing_note IS NULL OR pricing_note = ''`,
+    [DEFAULT_PRICING_NOTE]
+  );
+}
+
+async function seedDefaultProducts() {
+  const { rows } = await query('SELECT COUNT(*)::int AS count FROM products');
+  if (rows[0].count > 0) return;
+
+  for (const p of DEFAULT_PRODUCTS) {
+    const result = await query(
+      `INSERT INTO products (name, category, base_price, description, specifications, turnaround_days, active, image)
+       VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING id`,
+      [p.name, p.category, p.basePrice, p.description, p.specifications, p.turnaroundDays, p.image]
+    );
+    const productId = result.rows[0].id;
+    for (let i = 0; i < DEFAULT_SIZES.length; i++) {
+      await query(
+        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order) VALUES ($1, $2, $3, $4)',
+        [productId, DEFAULT_SIZES[i].label, DEFAULT_SIZES[i].price, i]
+      );
+    }
+  }
+}
+
+async function seedDefaultTemplates() {
   const { rows: templateRows } = await query('SELECT COUNT(*)::int AS count FROM templates');
   if (templateRows[0].count === 0) {
     for (const t of DEFAULT_TEMPLATES) {
@@ -171,4 +257,4 @@ async function initSchema() {
   }
 }
 
-module.exports = { pool, query, initSchema };
+module.exports = { pool, query, initSchema, DEFAULT_SIZES, DEFAULT_PRICING_NOTE };
