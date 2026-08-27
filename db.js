@@ -141,6 +141,17 @@ async function initSchema() {
     );
   `);
 
+  // Quotes carry structured line items so a quote can be edited (and re-priced)
+  // before it is turned into an order. Orders remember the quote they came from.
+  await query(`
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS line_items JSONB DEFAULT '[]';
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS tax NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS total NUMERIC DEFAULT 0;
+    ALTER TABLE quotes ADD COLUMN IF NOT EXISTS valid_until DATE;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS quote_id INTEGER;
+  `);
+
   const { rows } = await query('SELECT COUNT(*)::int AS count FROM products');
   if (rows[0].count === 0) {
     for (const p of DEFAULT_PRODUCTS) {

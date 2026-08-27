@@ -88,8 +88,33 @@ function mapQuote(row) {
     status: row.status,
     createdAt: row.created_at,
     respondedAt: row.responded_at,
-    notes: row.notes || ''
+    notes: row.notes || '',
+    lineItems: row.line_items || [],
+    subtotal: Number(row.subtotal || 0),
+    tax: Number(row.tax || 0),
+    total: Number(row.total || 0),
+    validUntil: row.valid_until instanceof Date ? row.valid_until.toISOString().split('T')[0] : row.valid_until
   };
+}
+
+// Line items arrive from the quote builder as {name, qty, price}. Recomputing the
+// money here keeps the stored totals honest regardless of what the client sent.
+const TAX_RATE = 0.15;
+
+function normaliseLineItems(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(item => ({
+      name: String(item.name || '').trim(),
+      qty: Number(item.qty) || 0,
+      price: Number(item.price) || 0
+    }))
+    .filter(item => item.name);
+}
+
+function priceLineItems(items) {
+  const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const tax = subtotal * TAX_RATE;
+  return { subtotal, tax, total: subtotal + tax };
 }
 
 function mapGallery(row) {
@@ -133,6 +158,7 @@ function mapProject(row) {
     dueDate: row.due_date instanceof Date ? row.due_date.toISOString().split('T')[0] : row.due_date,
     status: row.status,
     notes: row.notes || '',
+    quoteId: row.quote_id === null || row.quote_id === undefined ? null : Number(row.quote_id),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -255,18 +281,22 @@ app.get('/api/categories', async (req, res) => {
 
 app.post('/api/quotes', async (req, res) => {
   try {
-    const { customerName, customerEmail, customerPhone, service, description, requirements } = req.body;
+    const { customerName, customerEmail, customerPhone, service, description, requirements, lineItems, validUntil } = req.body;
     const referenceNumber = 'QT-' + Date.now();
+    const items = normaliseLineItems(lineItems);
+    const { subtotal, tax, total } = priceLineItems(items);
 
-    await db.query(
-      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
-      [referenceNumber, customerName, customerEmail, customerPhone || '', service, description || '', requirements || '']
+    const { rows } = await db.query(
+      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status, line_items, subtotal, tax, total, valid_until)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12) RETURNING *`,
+      [referenceNumber, customerName, customerEmail, customerPhone || '', service, description || '', requirements || '',
+       JSON.stringify(items), subtotal, tax, total, validUntil || null]
     );
 
     res.json({
       success: true,
       referenceNumber,
+      quote: mapQuote(rows[0]),
       message: 'Quote request received. We will respond within 24 hours.'
     });
   } catch (err) {
@@ -343,17 +373,78 @@ app.get('/api/admin/quotes/:id', adminAuth, async (req, res) => {
   }
 });
 
+// Quotes built in the admin quote builder. Saving a quote here only ever creates
+// a quote — turning it into an order is a separate, explicit step.
+app.post('/api/admin/quotes', adminAuth, async (req, res) => {
+  try {
+    const { customerName, customerEmail, customerPhone, service, description, requirements, lineItems, notes, validUntil } = req.body;
+    if (!customerName) {
+      return res.status(400).json({ error: 'Customer name is required' });
+    }
+
+    const items = normaliseLineItems(lineItems);
+    const { subtotal, tax, total } = priceLineItems(items);
+    const referenceNumber = 'QT-' + Date.now();
+
+    const { rows } = await db.query(
+      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status, notes, line_items, subtotal, tax, total, valid_until)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [
+        referenceNumber, customerName, customerEmail || '', customerPhone || '', service || '',
+        description || '', requirements || '', notes || '',
+        JSON.stringify(items), subtotal, tax, total, validUntil || null
+      ]
+    );
+
+    res.json({ success: true, quote: mapQuote(rows[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.patch('/api/admin/quotes/:id', adminAuth, async (req, res) => {
   try {
-    const { status, notes } = req.body;
-    const { rows } = await db.query(
-      `UPDATE quotes SET status = $1, notes = $2, responded_at = now() WHERE id = $3 RETURNING id`,
-      [status, notes || '', parseInt(req.params.id)]
-    );
-    if (!rows.length) {
+    const id = parseInt(req.params.id);
+    const { rows: existingRows } = await db.query('SELECT * FROM quotes WHERE id = $1', [id]);
+    if (!existingRows.length) {
       return res.status(404).json({ error: 'Quote not found' });
     }
-    res.json({ success: true, message: 'Quote updated' });
+    const existing = existingRows[0];
+    const updates = req.body || {};
+
+    // Only fields that were actually sent are changed, so a status-only PATCH
+    // never wipes the quote's contents.
+    const pick = (field, column) => (updates.hasOwnProperty(field) ? updates[field] : existing[column]);
+
+    const items = updates.hasOwnProperty('lineItems')
+      ? normaliseLineItems(updates.lineItems)
+      : (existing.line_items || []);
+    const { subtotal, tax, total } = updates.hasOwnProperty('lineItems')
+      ? priceLineItems(items)
+      : { subtotal: existing.subtotal, tax: existing.tax, total: existing.total };
+
+    const { rows } = await db.query(
+      `UPDATE quotes SET customer_name = $1, customer_email = $2, customer_phone = $3, service = $4,
+       description = $5, requirements = $6, status = $7, notes = $8, line_items = $9,
+       subtotal = $10, tax = $11, total = $12, valid_until = $13, responded_at = now()
+       WHERE id = $14 RETURNING *`,
+      [
+        pick('customerName', 'customer_name'),
+        pick('customerEmail', 'customer_email'),
+        pick('customerPhone', 'customer_phone') || '',
+        pick('service', 'service'),
+        pick('description', 'description') || '',
+        pick('requirements', 'requirements') || '',
+        pick('status', 'status'),
+        pick('notes', 'notes') || '',
+        JSON.stringify(items),
+        subtotal, tax, total,
+        pick('validUntil', 'valid_until') || null,
+        id
+      ]
+    );
+
+    res.json({ success: true, quote: mapQuote(rows[0]), message: 'Quote updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -787,7 +878,7 @@ app.get('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
 app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
-    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes } = req.body;
+    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId } = req.body;
 
     if (!projectName || !customerName || !dueDate || !status) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -795,8 +886,8 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
 
     const id = Date.now();
     const { rows } = await db.query(
-      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes, quote_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
         id,
         projectName.trim(),
@@ -808,7 +899,8 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
         quotedPrice?.trim() || '',
         dueDate,
         status.toLowerCase(),
-        notes?.trim() || ''
+        notes?.trim() || '',
+        quoteId ? parseInt(quoteId) : null
       ]
     );
 

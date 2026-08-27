@@ -1146,8 +1146,9 @@
         console.error('Error logging out:', error);
       }
       isLoggedIn = false;
-      showLoginScreen();
       document.getElementById('adminPassword').value = '';
+      // Logging out drops you back on the public site, not a stranded login box.
+      window.location.href = 'index.html';
     }
 
     // TAB SWITCHING
