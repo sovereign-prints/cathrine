@@ -90,8 +90,6 @@ function displayProducts() {
       </div>
       <div class="product-info">
         <h3>${product.name}</h3>
-        <p>${product.description || 'Custom branding and printing service'}</p>
-        <div class="product-price">${priceSummary(product)}</div>
         <button class="btn-view" data-product-id="${product.id}">View Details</button>
       </div>
     </div>
@@ -114,16 +112,6 @@ function displayProducts() {
       showProductModal(productId);
     });
   });
-}
-
-// ============ PRICING ============
-
-// Pricing is quoted per print size, so the card advertises the cheapest size.
-function priceSummary(product) {
-  const sizes = product.sizes || [];
-  if (!sizes.length) return `From R${product.startsFrom || product.basePrice || 0}`;
-  const cheapest = sizes.reduce((min, s) => (s.startPrice < min.startPrice ? s : min), sizes[0]);
-  return `${cheapest.label} from R${cheapest.startPrice}`;
 }
 
 // ============ MODAL ============
