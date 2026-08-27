@@ -55,7 +55,14 @@ async function saveUploadedFile(file) {
 
 // ============ ROW MAPPERS (DB snake_case -> API camelCase) ============
 
-function mapProduct(row, tiers) {
+function mapProduct(row, sizes, images) {
+  const imageList = (images || []).map(i => ({ id: i.id, url: i.image_url }));
+  const sizeList = (sizes || []).map(s => ({
+    id: s.id,
+    label: s.size_label,
+    startPrice: Number(s.start_price)
+  }));
+
   return {
     id: row.id,
     name: row.name,
@@ -65,14 +72,35 @@ function mapProduct(row, tiers) {
     specifications: row.specifications || '',
     turnaroundDays: row.turnaround_days,
     active: row.active,
-    image: row.image,
-    pricingTiers: (tiers || []).map(t => ({
-      id: t.id,
-      quantityMin: t.quantity_min,
-      quantityMax: t.quantity_max,
-      price: Number(t.price)
-    }))
+    // The first image stays the card/thumbnail image; the rest are extras.
+    image: imageList.length ? imageList[0].url : row.image,
+    images: imageList,
+    sizes: sizeList,
+    startsFrom: sizeList.length ? Math.min(...sizeList.map(s => s.startPrice)) : Number(row.base_price),
+    pricingNote: row.pricing_note || ''
   };
+}
+
+// Products, their size pricing and their images, assembled in one round trip.
+async function loadProducts(whereSql, params) {
+  const { rows } = await db.query(`SELECT * FROM products ${whereSql} ORDER BY id`, params);
+  if (!rows.length) return [];
+
+  const ids = rows.map(r => r.id);
+  const [sizesRes, imagesRes] = await Promise.all([
+    db.query('SELECT * FROM product_sizes WHERE product_id = ANY($1) ORDER BY display_order, id', [ids]),
+    db.query('SELECT * FROM product_images WHERE product_id = ANY($1) ORDER BY display_order, id', [ids])
+  ]);
+
+  const group = (list) => list.reduce((acc, item) => {
+    (acc[item.product_id] ||= []).push(item);
+    return acc;
+  }, {});
+
+  const sizesByProduct = group(sizesRes.rows);
+  const imagesByProduct = group(imagesRes.rows);
+
+  return rows.map(r => mapProduct(r, sizesByProduct[r.id], imagesByProduct[r.id]));
 }
 
 function mapQuote(row) {
@@ -93,7 +121,8 @@ function mapQuote(row) {
     subtotal: Number(row.subtotal || 0),
     tax: Number(row.tax || 0),
     total: Number(row.total || 0),
-    validUntil: row.valid_until instanceof Date ? row.valid_until.toISOString().split('T')[0] : row.valid_until
+    validUntil: row.valid_until instanceof Date ? row.valid_until.toISOString().split('T')[0] : row.valid_until,
+    attachments: row.attachments || []
   };
 }
 
@@ -237,19 +266,12 @@ app.get('/api/products', async (req, res) => {
   try {
     const category = req.query.category;
     const params = [];
-    let sql = 'SELECT * FROM products WHERE active = true';
+    let where = 'WHERE active = true';
     if (category) {
       params.push(category);
-      sql += ` AND category = $${params.length}`;
+      where += ` AND category = $${params.length}`;
     }
-    sql += ' ORDER BY id';
-    const { rows } = await db.query(sql, params);
-    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = ANY($1) ORDER BY quantity_min', [rows.map(r => r.id)]);
-    const tiersByProduct = {};
-    tiersRes.rows.forEach(t => {
-      (tiersByProduct[t.product_id] ||= []).push(t);
-    });
-    res.json(rows.map(r => mapProduct(r, tiersByProduct[r.id])));
+    res.json(await loadProducts(where, params));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -257,12 +279,11 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/products/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT * FROM products WHERE id = $1', [parseInt(req.params.id)]);
-    if (!rows.length) {
+    const products = await loadProducts('WHERE id = $1', [parseInt(req.params.id)]);
+    if (!products.length) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = $1 ORDER BY quantity_min', [rows[0].id]);
-    res.json(mapProduct(rows[0], tiersRes.rows));
+    res.json(products[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -279,18 +300,25 @@ app.get('/api/categories', async (req, res) => {
 
 // ============ QUOTE ROUTES ============
 
-app.post('/api/quotes', async (req, res) => {
+// Customers can attach reference images to a quote request, so the form is sent
+// as multipart. JSON bodies without files still work unchanged.
+app.post('/api/quotes', upload.array('attachments', 8), async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, service, description, requirements, lineItems, validUntil } = req.body;
     const referenceNumber = 'QT-' + Date.now();
-    const items = normaliseLineItems(lineItems);
+    const items = normaliseLineItems(typeof lineItems === 'string' ? JSON.parse(lineItems || '[]') : lineItems);
     const { subtotal, tax, total } = priceLineItems(items);
 
+    const attachments = [];
+    for (const file of req.files || []) {
+      attachments.push({ url: await saveUploadedFile(file), filename: file.originalname });
+    }
+
     const { rows } = await db.query(
-      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status, line_items, subtotal, tax, total, valid_until)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12) RETURNING *`,
+      `INSERT INTO quotes (reference_number, customer_name, customer_email, customer_phone, service, description, requirements, status, line_items, subtotal, tax, total, valid_until, attachments)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $13) RETURNING *`,
       [referenceNumber, customerName, customerEmail, customerPhone || '', service, description || '', requirements || '',
-       JSON.stringify(items), subtotal, tax, total, validUntil || null]
+       JSON.stringify(items), subtotal, tax, total, validUntil || null, JSON.stringify(attachments)]
     );
 
     res.json({
@@ -466,39 +494,45 @@ app.delete('/api/admin/quotes/:id', adminAuth, async (req, res) => {
 
 app.get('/api/admin/products', adminAuth, async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT * FROM products ORDER BY id');
-    const tiersRes = await db.query('SELECT * FROM pricing_tiers WHERE product_id = ANY($1) ORDER BY quantity_min', [rows.map(r => r.id)]);
-    const tiersByProduct = {};
-    tiersRes.rows.forEach(t => {
-      (tiersByProduct[t.product_id] ||= []).push(t);
-    });
-    res.json(rows.map(r => mapProduct(r, tiersByProduct[r.id])));
+    res.json(await loadProducts('', []));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/products', adminAuth, upload.single('image'), async (req, res) => {
+// Accepts any number of images at once; they all become pictures of the product.
+app.post('/api/admin/products', adminAuth, upload.array('images', 12), async (req, res) => {
   try {
-    const { name, category, basePrice, description, specifications, turnaroundDays } = req.body;
-    const imagePath = req.file ? await saveUploadedFile(req.file) : null;
+    const { name, category, basePrice, description, specifications, turnaroundDays, pricingNote } = req.body;
+    const files = req.files || [];
+    const imagePaths = [];
+    for (const file of files) {
+      imagePaths.push(await saveUploadedFile(file));
+    }
+
     const { rows } = await db.query(
-      `INSERT INTO products (name, category, base_price, description, specifications, turnaround_days, active, image)
-       VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING id`,
-      [name, category, basePrice, description || '', specifications || '', turnaroundDays || 5, imagePath]
+      `INSERT INTO products (name, category, base_price, description, specifications, turnaround_days, active, image, pricing_note)
+       VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8) RETURNING id`,
+      [
+        name, category, basePrice || 0, description || '', specifications || '',
+        turnaroundDays || 5, imagePaths[0] || null,
+        pricingNote || db.DEFAULT_PRICING_NOTE
+      ]
     );
     const productId = rows[0].id;
 
-    const tiers = [
-      { min: 1, max: 10, price: basePrice },
-      { min: 11, max: 50, price: Math.round(basePrice * 0.9) },
-      { min: 51, max: 100, price: Math.round(basePrice * 0.8) },
-      { min: 101, max: null, price: Math.round(basePrice * 0.7) }
-    ];
-    for (const t of tiers) {
+    for (let i = 0; i < imagePaths.length; i++) {
       await db.query(
-        'INSERT INTO pricing_tiers (product_id, quantity_min, quantity_max, price) VALUES ($1, $2, $3, $4)',
-        [productId, t.min, t.max, t.price]
+        'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
+        [productId, imagePaths[i], i]
+      );
+    }
+
+    // Every product starts on the standard size pricing; edit it in the Pricing tab.
+    for (let i = 0; i < db.DEFAULT_SIZES.length; i++) {
+      await db.query(
+        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order) VALUES ($1, $2, $3, $4)',
+        [productId, db.DEFAULT_SIZES[i].label, db.DEFAULT_SIZES[i].price, i]
       );
     }
 
@@ -510,16 +544,131 @@ app.post('/api/admin/products', adminAuth, upload.single('image'), async (req, r
 
 app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
   try {
-    const { name, category, basePrice, description, specifications, turnaroundDays, active } = req.body;
-    const { rows } = await db.query(
+    const id = parseInt(req.params.id);
+    const { rows: existingRows } = await db.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (!existingRows.length) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const existing = existingRows[0];
+    const updates = req.body || {};
+    const pick = (field, column) => (updates.hasOwnProperty(field) ? updates[field] : existing[column]);
+
+    await db.query(
       `UPDATE products SET name = $1, category = $2, base_price = $3, description = $4,
-       specifications = $5, turnaround_days = $6, active = $7 WHERE id = $8 RETURNING id`,
-      [name, category, basePrice, description || '', specifications || '', turnaroundDays || 5, active !== false, parseInt(req.params.id)]
+       specifications = $5, turnaround_days = $6, active = $7, pricing_note = $8 WHERE id = $9`,
+      [
+        pick('name', 'name'),
+        pick('category', 'category'),
+        pick('basePrice', 'base_price') || 0,
+        pick('description', 'description') || '',
+        pick('specifications', 'specifications') || '',
+        pick('turnaroundDays', 'turnaround_days') || 5,
+        updates.hasOwnProperty('active') ? updates.active !== false : existing.active,
+        pick('pricingNote', 'pricing_note') || '',
+        id
+      ]
     );
+
+    res.json({ success: true, message: 'Product updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ PRINT SIZE PRICING ============
+
+// Replaces the whole size list for a product in one go — the Pricing tab edits
+// all the rows together, so a single write keeps them consistent.
+app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { rows } = await db.query('SELECT id FROM products WHERE id = $1', [id]);
     if (!rows.length) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json({ success: true, message: 'Product updated' });
+
+    const sizes = (Array.isArray(req.body.sizes) ? req.body.sizes : [])
+      .map(s => ({ label: String(s.label || '').trim(), startPrice: Number(s.startPrice) || 0 }))
+      .filter(s => s.label);
+
+    await db.query('DELETE FROM product_sizes WHERE product_id = $1', [id]);
+    for (let i = 0; i < sizes.length; i++) {
+      await db.query(
+        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order) VALUES ($1, $2, $3, $4)',
+        [id, sizes[i].label, sizes[i].startPrice, i]
+      );
+    }
+
+    if (req.body.hasOwnProperty('pricingNote')) {
+      await db.query('UPDATE products SET pricing_note = $1 WHERE id = $2', [req.body.pricingNote || '', id]);
+    }
+
+    const products = await loadProducts('WHERE id = $1', [id]);
+    res.json({ success: true, product: products[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ PRODUCT IMAGES ============
+
+// Adds pictures to a product. Existing pictures are always kept.
+app.post('/api/admin/products/:id/images', adminAuth, upload.array('images', 12), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { rows } = await db.query('SELECT id, image FROM products WHERE id = $1', [id]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    if (!req.files || !req.files.length) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const { rows: orderRows } = await db.query(
+      'SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM product_images WHERE product_id = $1',
+      [id]
+    );
+    let order = orderRows[0].next_order;
+
+    const added = [];
+    for (const file of req.files) {
+      const url = await saveUploadedFile(file);
+      const { rows: inserted } = await db.query(
+        'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3) RETURNING id, image_url',
+        [id, url, order++]
+      );
+      added.push({ id: inserted[0].id, url: inserted[0].image_url });
+    }
+
+    // Keep the legacy single-image column pointing at the first picture.
+    if (!rows[0].image && added.length) {
+      await db.query('UPDATE products SET image = $1 WHERE id = $2', [added[0].url, id]);
+    }
+
+    res.json({ success: true, images: added });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/products/:id/images/:imageId', adminAuth, async (req, res) => {
+  try {
+    const productId = parseInt(req.params.id);
+    const { rows } = await db.query(
+      'DELETE FROM product_images WHERE id = $1 AND product_id = $2 RETURNING image_url',
+      [parseInt(req.params.imageId), productId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    const { rows: remaining } = await db.query(
+      'SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order, id LIMIT 1',
+      [productId]
+    );
+    await db.query('UPDATE products SET image = $1 WHERE id = $2', [remaining[0]?.image_url || null, productId]);
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -540,41 +689,6 @@ app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
   }
 });
 
-app.patch('/api/admin/pricing/:tierId', adminAuth, async (req, res) => {
-  try {
-    const { price } = req.body;
-    const { rows } = await db.query(
-      'UPDATE pricing_tiers SET price = $1 WHERE id = $2 RETURNING id',
-      [price, parseInt(req.params.tierId)]
-    );
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Pricing tier not found' });
-    }
-    res.json({ success: true, message: 'Price updated' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.patch('/api/admin/products/:id/image', adminAuth, upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-    const imagePath = await saveUploadedFile(req.file);
-    const { rows } = await db.query(
-      'UPDATE products SET image = $1 WHERE id = $2 RETURNING id',
-      [imagePath, parseInt(req.params.id)]
-    );
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    res.json({ success: true, image: imagePath });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.post('/api/admin/upload', adminAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -582,26 +696,6 @@ app.post('/api/admin/upload', adminAuth, upload.single('image'), async (req, res
     }
     const url = await saveUploadedFile(req.file);
     res.json({ success: true, url });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/admin/product-image', adminAuth, upload.single('image'), async (req, res) => {
-  try {
-    const { productId } = req.body;
-    if (!productId || !req.file) {
-      return res.status(400).json({ error: 'Product ID and image required' });
-    }
-    const imagePath = await saveUploadedFile(req.file);
-    const { rows } = await db.query(
-      'UPDATE products SET image = $1 WHERE id = $2 RETURNING id',
-      [imagePath, parseInt(productId)]
-    );
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    res.json({ success: true, productId: parseInt(productId), imagePath });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -618,22 +712,36 @@ app.get('/api/admin/gallery', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/gallery', adminAuth, upload.single('image'), async (req, res) => {
+// Takes one or many images at once and adds each as its own gallery entry.
+// Existing gallery items are never touched.
+app.post('/api/admin/gallery', adminAuth, upload.array('images', 20), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    const files = req.files || [];
+    if (!files.length) {
+      return res.status(400).json({ error: 'No files uploaded' });
     }
     const { title, category, description } = req.body;
-    const imageUrl = await saveUploadedFile(req.file);
 
     const { rows: maxOrderRows } = await db.query('SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM gallery');
-    const { rows } = await db.query(
-      `INSERT INTO gallery (title, category, description, image_url, active, display_order)
-       VALUES ($1, $2, $3, $4, true, $5) RETURNING *`,
-      [title || 'Untitled', category || 'General', description || '', imageUrl, maxOrderRows[0].next_order]
-    );
+    let order = maxOrderRows[0].next_order;
 
-    res.json({ success: true, item: mapGallery(rows[0]) });
+    const items = [];
+    for (let i = 0; i < files.length; i++) {
+      const imageUrl = await saveUploadedFile(files[i]);
+      // With a batch upload, number the titles so they stay distinguishable.
+      const itemTitle = files.length > 1
+        ? `${title || 'Untitled'} ${i + 1}`
+        : (title || 'Untitled');
+
+      const { rows } = await db.query(
+        `INSERT INTO gallery (title, category, description, image_url, active, display_order)
+         VALUES ($1, $2, $3, $4, true, $5) RETURNING *`,
+        [itemTitle, category || 'General', description || '', imageUrl, order++]
+      );
+      items.push(mapGallery(rows[0]));
+    }
+
+    res.json({ success: true, items, item: items[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -996,6 +1104,21 @@ app.delete('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete project' });
   }
+});
+
+// Upload problems (wrong file type, over the size limit) should read as a clear
+// 400 rather than a generic server error.
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message === 'Invalid file type') {
+    return res.status(400).json({
+      error: err.code === 'LIMIT_FILE_SIZE'
+        ? 'That image is too large. Please keep each file under 10MB.'
+        : err.message === 'Invalid file type'
+          ? 'Only JPG, PNG, GIF and WebP images can be uploaded.'
+          : err.message
+    });
+  }
+  next(err);
 });
 
 // Serve pre-packaged sample images committed to the repo

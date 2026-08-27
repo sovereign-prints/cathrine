@@ -316,6 +316,101 @@
       border-radius: 6px;
     }
 
+    /* Thumbnails of files queued for upload */
+    .image-preview-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .image-preview-grid img {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Pictures already attached to a product, each removable on its own */
+    .image-manager {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .image-manager .managed-image {
+      position: relative;
+      width: 90px;
+      height: 90px;
+    }
+
+    .image-manager .managed-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    .image-manager .managed-image button {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--error);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    /* PRICING TAB */
+    .size-row {
+      display: grid;
+      grid-template-columns: 1fr 140px 44px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .size-row input {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      background: var(--surface-2);
+      color: var(--text);
+      width: 100%;
+    }
+
+    .size-row button {
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+      cursor: pointer;
+    }
+
+    .size-row-head {
+      font-size: 12px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 600px) {
+      .size-row {
+        grid-template-columns: 1fr 110px 44px;
+      }
+    }
+
     /* PRODUCT/GALLERY CARDS */
     .item-grid {
       display: grid;
@@ -645,9 +740,11 @@
       <ul class="sidebar-nav">
         <a href="#" data-tab="dashboard" class="sidebar-link active">📊 Dashboard</a>
         <a href="#" data-tab="products" class="sidebar-link">📦 Products</a>
+        <a href="#" data-tab="pricing" class="sidebar-link">💰 Pricing</a>
         <a href="#" data-tab="gallery" class="sidebar-link">🖼️ Gallery</a>
         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
-        <a href="order-tracking.html" class="sidebar-link">💼 Orders & Quotes</a>
+        <a href="order-tracking.html" class="sidebar-link">💼 Quotes & Orders</a>
+        <a href="index.html" class="sidebar-link">🏠 View Site</a>
         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
       </ul>
     </aside>
@@ -726,13 +823,13 @@
             </div>
 
             <div class="form-group">
-              <label>Product Image *</label>
+              <label>Product Images *</label>
               <div class="image-upload" id="productImageUpload" onclick="document.getElementById('productImageInput').click();">
                 <div>📸 Click to upload or drag and drop</div>
-                <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">PNG, JPG up to 5MB</div>
-                <input type="file" id="productImageInput" accept="image/*" onchange="previewProductImage()">
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">Pick several at once — PNG, JPG, GIF or WebP up to 10MB each</div>
+                <input type="file" id="productImageInput" accept="image/*" multiple onchange="previewProductImage()">
               </div>
-              <img id="productImagePreview" class="image-preview" style="display: none;">
+              <div id="productImagePreview" class="image-preview-grid"></div>
             </div>
 
             <div class="btn-group">
@@ -747,6 +844,22 @@
           <div class="item-grid" id="productsList">
             <p style="grid-column: 1/-1; text-align: center; color: var(--text-light); padding: 40px 0;">No products yet. Add one above!</p>
           </div>
+        </div>
+      </div>
+
+      <!-- PRICING TAB -->
+      <div id="pricing" class="tab-content">
+        <div class="section">
+          <h2>Print Size Pricing</h2>
+          <p>
+            Pricing is per print size, not per quantity — A5 starts at R50, A4 at R100.
+            Set a starting price for each size you offer on a product, and use the note to
+            explain that the detail in a design changes the final cost.
+          </p>
+        </div>
+
+        <div id="pricingList">
+          <div class="section"><p>Loading products…</p></div>
         </div>
       </div>
 
@@ -780,17 +893,17 @@
             </div>
 
             <div class="form-group">
-              <label>Image *</label>
+              <label>Images *</label>
               <div class="image-upload" id="galleryImageUpload" onclick="document.getElementById('galleryImageInput').click();">
                 <div>📸 Click to upload or drag and drop</div>
-                <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">PNG, JPG up to 5MB</div>
-                <input type="file" id="galleryImageInput" accept="image/*" onchange="previewGalleryImage()">
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">Pick several at once — each becomes its own gallery entry. Existing items are kept.</div>
+                <input type="file" id="galleryImageInput" accept="image/*" multiple onchange="previewGalleryImage()">
               </div>
-              <img id="galleryImagePreview" class="image-preview" style="display: none;">
+              <div id="galleryImagePreview" class="image-preview-grid"></div>
             </div>
 
             <div class="btn-group">
-              <button type="submit" class="btn btn-primary">Save to Gallery</button>
+              <button type="submit" class="btn btn-primary">Add to Gallery</button>
               <button type="reset" class="btn btn-secondary">Clear</button>
             </div>
           </form>
@@ -955,17 +1068,21 @@
           <textarea id="productEditDescription"></textarea>
         </div>
         <div class="form-group">
-          <label>Replace Image (optional)</label>
-          <div class="image-upload" id="productEditImageUpload" onclick="document.getElementById('productEditImageInput').click();">
-            <div>📸 Click to upload or drag and drop</div>
-            <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">PNG, JPG up to 5MB</div>
-            <input type="file" id="productEditImageInput" accept="image/*" onchange="previewProductEditImage()">
+          <label>Pictures</label>
+          <div id="productEditImages" class="image-manager"></div>
+          <div style="font-size: 12px; color: var(--text-light); margin-bottom: 10px;">
+            Adding pictures keeps the existing ones. The first picture is used on the product card.
           </div>
-          <img id="productEditImagePreview" class="image-preview" style="display: none;">
+          <div class="image-upload" id="productEditImageUpload" onclick="document.getElementById('productEditImageInput').click();">
+            <div>➕ Add more pictures</div>
+            <div style="font-size: 12px; color: var(--text-light); margin-top: 6px;">Pick several at once — PNG, JPG, GIF or WebP up to 10MB each</div>
+            <input type="file" id="productEditImageInput" accept="image/*" multiple onchange="previewProductEditImage()">
+          </div>
+          <div id="productEditImagePreview" class="image-preview-grid"></div>
         </div>
         <div class="form-group">
-          <label>Pricing Tiers (R per unit, by quantity)</label>
-          <div id="productEditPricingTiers"></div>
+          <label>Pricing</label>
+          <p style="font-size: 13px;">Print size pricing is edited in the <strong>💰 Pricing</strong> tab.</p>
         </div>
         <div class="btn-group" style="margin-top: 20px;">
           <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -1168,6 +1285,7 @@
         if (productsRes.ok) {
           allProducts = await productsRes.json();
           displayProducts();
+          displayPricing();
         }
 
         // Load gallery
@@ -1327,9 +1445,7 @@
       formData.append('description', document.getElementById('productDescription').value);
 
       const imageInput = document.getElementById('productImageInput');
-      if (imageInput.files.length) {
-        formData.append('image', imageInput.files[0]);
-      }
+      Array.from(imageInput.files).forEach(file => formData.append('images', file));
 
       try {
         const response = await fetch('/api/admin/products', {
@@ -1337,27 +1453,39 @@
           body: formData
         });
 
-        if (response.ok) {
-          document.getElementById('productForm').reset();
-          document.getElementById('productImagePreview').style.display = 'none';
-          loadData();
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to add product');
         }
+
+        document.getElementById('productForm').reset();
+        document.getElementById('productImagePreview').innerHTML = '';
+        loadData();
       } catch (error) {
         alert('Error adding product: ' + error.message);
       }
     }
 
-    function previewProductImage() {
-      const input = document.getElementById('productImageInput');
-      const preview = document.getElementById('productImagePreview');
-      if (input.files.length) {
+    // Renders a thumbnail for every file queued in a multi-file input.
+    function renderFilePreviews(inputId, previewId) {
+      const input = document.getElementById(inputId);
+      const preview = document.getElementById(previewId);
+      preview.innerHTML = '';
+      Array.from(input.files).forEach(file => {
         const reader = new FileReader();
         reader.onload = (e) => {
-          preview.src = e.target.result;
-          preview.style.display = 'block';
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.alt = file.name;
+          img.title = file.name;
+          preview.appendChild(img);
         };
-        reader.readAsDataURL(input.files[0]);
-      }
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function previewProductImage() {
+      renderFilePreviews('productImageInput', 'productImagePreview');
     }
 
     async function deleteProduct(id) {
@@ -1391,21 +1519,39 @@
       }
       categorySelect.value = product.category;
       document.getElementById('productEditDescription').value = product.description || '';
-      document.getElementById('productEditImagePreview').style.display = 'none';
+      document.getElementById('productEditImagePreview').innerHTML = '';
       document.getElementById('productEditImageInput').value = '';
-
-      const tiersContainer = document.getElementById('productEditPricingTiers');
-      const tiers = product.pricingTiers || [];
-      tiersContainer.innerHTML = tiers.map(t => `
-        <div class="form-row" data-tier-id="${t.id}" style="align-items:center; gap:8px; margin-bottom:6px;">
-          <div style="flex:1;">${t.quantityMax ? `${t.quantityMin}–${t.quantityMax} units` : `${t.quantityMin}+ units`}</div>
-          <div style="width:120px;">
-            <input type="number" step="0.01" min="0" class="tier-price-input" value="${t.price}" style="width:100%;">
-          </div>
-        </div>
-      `).join('') || '<div style="color:var(--text-light);font-size:13px;">No pricing tiers for this product.</div>';
+      renderProductEditImages(product);
 
       document.getElementById('productEditModal').classList.add('active');
+    }
+
+    function renderProductEditImages(product) {
+      const container = document.getElementById('productEditImages');
+      const images = product.images || [];
+      container.innerHTML = images.length
+        ? images.map(img => `
+            <div class="managed-image">
+              <img src="${img.url}" alt="${product.name}">
+              <button type="button" title="Remove this picture" onclick="deleteProductImage(${product.id}, ${img.id})">&times;</button>
+            </div>
+          `).join('')
+        : '<div style="color:var(--text-light);font-size:13px;">No pictures yet.</div>';
+    }
+
+    async function deleteProductImage(productId, imageId) {
+      if (!confirm('Remove this picture? The other pictures are kept.')) return;
+
+      try {
+        const response = await fetch(`/api/admin/products/${productId}/images/${imageId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to remove picture');
+
+        await loadData();
+        const product = allProducts.find(p => p.id === productId);
+        if (product) renderProductEditImages(product);
+      } catch (error) {
+        alert('Error removing picture: ' + error.message);
+      }
     }
 
     function closeProductEditModal() {
@@ -1414,16 +1560,7 @@
     }
 
     function previewProductEditImage() {
-      const input = document.getElementById('productEditImageInput');
-      const preview = document.getElementById('productEditImagePreview');
-      if (input.files.length) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          preview.src = e.target.result;
-          preview.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
-      }
+      renderFilePreviews('productEditImageInput', 'productEditImagePreview');
     }
 
     async function handleUpdateProduct(e) {
@@ -1452,33 +1589,108 @@
 
         if (!response.ok) throw new Error('Failed to update product');
 
+        // Newly picked files are added to the product; nothing already there is replaced.
         const imageInput = document.getElementById('productEditImageInput');
         if (imageInput.files.length) {
           const formData = new FormData();
-          formData.append('image', imageInput.files[0]);
-          const imgRes = await fetch(`/api/admin/products/${editingProductId}/image`, {
-            method: 'PATCH',
+          Array.from(imageInput.files).forEach(file => formData.append('images', file));
+          const imgRes = await fetch(`/api/admin/products/${editingProductId}/images`, {
+            method: 'POST',
             body: formData
           });
-          if (!imgRes.ok) throw new Error('Failed to update product image');
-        }
-
-        const tierRows = document.querySelectorAll('#productEditPricingTiers [data-tier-id]');
-        for (const row of tierRows) {
-          const tierId = row.dataset.tierId;
-          const price = row.querySelector('.tier-price-input').value;
-          const tierRes = await fetch(`/api/admin/pricing/${tierId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ price })
-          });
-          if (!tierRes.ok) throw new Error('Failed to update a pricing tier');
+          if (!imgRes.ok) {
+            const data = await imgRes.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to add product pictures');
+          }
         }
 
         closeProductEditModal();
         loadData();
       } catch (error) {
         alert('Error updating product: ' + error.message);
+      }
+    }
+
+    // PRICING — starting price per print size, for each product
+    function displayPricing() {
+      const container = document.getElementById('pricingList');
+      if (!allProducts.length) {
+        container.innerHTML = '<div class="section"><p>No products yet. Add one in the Products tab first.</p></div>';
+        return;
+      }
+
+      container.innerHTML = allProducts.map(product => `
+        <div class="section" data-pricing-product="${product.id}">
+          <h3>${product.name} <span style="color:var(--text-light);font-weight:400;">— ${product.category}</span></h3>
+
+          <div class="size-row size-row-head">
+            <div>Print Size</div>
+            <div>Starting Price (R)</div>
+            <div></div>
+          </div>
+          <div class="sizes-container"></div>
+
+          <button type="button" class="btn btn-secondary btn-small" onclick="addSizeRow(${product.id})">+ Add Size</button>
+
+          <div class="form-group" style="margin-top:16px;">
+            <label>Pricing Note (shown to customers)</label>
+            <textarea class="pricing-note-input" placeholder="e.g. The detail in your design affects the final cost.">${product.pricingNote || ''}</textarea>
+          </div>
+
+          <div class="btn-group">
+            <button type="button" class="btn btn-primary" onclick="saveSizePricing(${product.id})">Save Pricing</button>
+          </div>
+        </div>
+      `).join('');
+
+      allProducts.forEach(product => {
+        const sizes = product.sizes && product.sizes.length ? product.sizes : [];
+        sizes.forEach(size => addSizeRow(product.id, size));
+        if (!sizes.length) addSizeRow(product.id);
+      });
+    }
+
+    function addSizeRow(productId, size) {
+      const section = document.querySelector(`[data-pricing-product="${productId}"] .sizes-container`);
+      if (!section) return;
+
+      const row = document.createElement('div');
+      row.className = 'size-row';
+      row.innerHTML = `
+        <input type="text" class="size-label-input" placeholder="A4" value="${size ? size.label : ''}">
+        <input type="number" class="size-price-input" min="0" step="1" placeholder="100" value="${size ? size.startPrice : ''}">
+        <button type="button" title="Remove this size">&times;</button>
+      `;
+      row.querySelector('button').addEventListener('click', () => row.remove());
+      section.appendChild(row);
+    }
+
+    async function saveSizePricing(productId) {
+      const section = document.querySelector(`[data-pricing-product="${productId}"]`);
+      if (!section) return;
+
+      // Scoped to the editable rows — the header row shares the .size-row class
+      // but holds no inputs.
+      const sizes = Array.from(section.querySelectorAll('.sizes-container .size-row')).map(row => ({
+        label: row.querySelector('.size-label-input').value.trim(),
+        startPrice: parseFloat(row.querySelector('.size-price-input').value) || 0
+      })).filter(size => size.label);
+
+      try {
+        const response = await fetch(`/api/admin/products/${productId}/sizes`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sizes,
+            pricingNote: section.querySelector('.pricing-note-input').value
+          })
+        });
+        if (!response.ok) throw new Error('Failed to save pricing');
+
+        alert('Pricing saved');
+        await loadData();
+      } catch (error) {
+        alert('Error saving pricing: ' + error.message);
       }
     }
 
@@ -1515,9 +1727,11 @@
       formData.append('description', document.getElementById('galleryDescription').value);
 
       const imageInput = document.getElementById('galleryImageInput');
-      if (imageInput.files.length) {
-        formData.append('image', imageInput.files[0]);
+      if (!imageInput.files.length) {
+        alert('Please choose at least one image');
+        return;
       }
+      Array.from(imageInput.files).forEach(file => formData.append('images', file));
 
       try {
         const response = await fetch('/api/admin/gallery', {
@@ -1525,27 +1739,21 @@
           body: formData
         });
 
-        if (response.ok) {
-          document.getElementById('galleryForm').reset();
-          document.getElementById('galleryImagePreview').style.display = 'none';
-          loadData();
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to add gallery items');
         }
+
+        document.getElementById('galleryForm').reset();
+        document.getElementById('galleryImagePreview').innerHTML = '';
+        loadData();
       } catch (error) {
         alert('Error adding gallery item: ' + error.message);
       }
     }
 
     function previewGalleryImage() {
-      const input = document.getElementById('galleryImageInput');
-      const preview = document.getElementById('galleryImagePreview');
-      if (input.files.length) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          preview.src = e.target.result;
-          preview.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
-      }
+      renderFilePreviews('galleryImageInput', 'galleryImagePreview');
     }
 
     async function deleteGallery(id) {

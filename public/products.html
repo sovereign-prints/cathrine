@@ -89,6 +89,58 @@
       color: #9ca3af;
     }
 
+    /* Badge showing a product has more than one picture */
+    .image-count {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(15, 15, 26, 0.8);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Extra product pictures, shown under the main image in the detail modal */
+    .modal-thumbnails {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .modal-thumbnails .thumb {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      opacity: 0.7;
+      transition: all 0.2s ease;
+    }
+
+    .modal-thumbnails .thumb:hover {
+      opacity: 1;
+    }
+
+    .modal-thumbnails .thumb.active {
+      border-color: #4f46e5;
+      opacity: 1;
+    }
+
+    .pricing-note {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #4b5563;
+      background: #f3f4f6;
+      border-left: 3px solid #4f46e5;
+      padding: 10px 12px;
+      border-radius: 4px;
+    }
+
     .product-info {
       padding: 20px;
     }
@@ -310,13 +362,15 @@
   <!-- Navigation -->
   <nav class="navbar">
     <div class="container">
-      <div class="navbar-brand">
-        <img src="logo.png" alt="Sovereign Prints" class="logo-mark" style="height: 50px; width: auto;">
-        <div>
-          <h1>Sovereign Prints</h1>
-          <p class="tagline">You bring it. We brand it.</p>
+      <a href="index.html" class="navbar-brand-link" title="Back to home">
+        <div class="navbar-brand">
+          <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark">
+          <div>
+            <h1>Sovereign Prints</h1>
+            <p class="tagline">You bring it. We brand it.</p>
+          </div>
         </div>
-      </div>
+      </a>
       <button class="hamburger" id="hamburger" aria-label="Toggle menu">
         <span></span>
         <span></span>
@@ -335,7 +389,7 @@
   <section class="page-header">
     <div class="container">
       <h1>Products & Pricing</h1>
-      <p>Browse our services and see starting prices. For custom jobs, request a quote.</p>
+      <p>Prices start from the print size — A5 from R50, A4 from R100. The detail in your artwork affects the final cost, so send us your design for an exact quote.</p>
     </div>
   </section>
 
@@ -360,19 +414,23 @@
     <div class="modal-content">
       <span class="close">&times;</span>
       <div class="modal-body">
-        <div class="product-image">
-          <img id="modalProductImage" src="" alt="Product" style="display:none;">
-          <div id="modalPlaceholderImage" class="placeholder-image">Product Image</div>
+        <div>
+          <div class="product-image">
+            <img id="modalProductImage" src="" alt="Product" style="display:none;">
+            <div id="modalPlaceholderImage" class="placeholder-image">Product Image</div>
+          </div>
+          <div id="modalThumbnails" class="modal-thumbnails"></div>
         </div>
         <div class="product-details">
           <h2 id="modalProductName"></h2>
           <p id="modalProductDescription"></p>
 
           <div class="pricing-table">
-            <h3>Pricing</h3>
+            <h3>Pricing by Print Size</h3>
             <table id="pricingTable">
               <!-- Populated by JavaScript -->
             </table>
+            <p id="modalPricingNote" class="pricing-note" style="display:none;"></p>
           </div>
 
           <div class="product-specs">

@@ -80,19 +80,23 @@ function displayProducts() {
   }
 
   // Render products
-  productsGrid.innerHTML = filteredProducts.map(product => `
+  productsGrid.innerHTML = filteredProducts.map(product => {
+    const imageCount = (product.images || []).length;
+    return `
     <div class="product-card" data-product-id="${product.id}">
       <div class="product-image">
         <img src="${product.image || product.imageUrl}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
+        ${imageCount > 1 ? `<span class="image-count">📷 ${imageCount}</span>` : ''}
       </div>
       <div class="product-info">
         <h3>${product.name}</h3>
         <p>${product.description || 'Custom branding and printing service'}</p>
-        <div class="product-price">From R${product.basePrice || '0'}</div>
+        <div class="product-price">${priceSummary(product)}</div>
         <button class="btn-view" data-product-id="${product.id}">View Details</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   // Add click listeners to "View Details" buttons
   document.querySelectorAll('.btn-view').forEach(btn => {
@@ -110,6 +114,16 @@ function displayProducts() {
       showProductModal(productId);
     });
   });
+}
+
+// ============ PRICING ============
+
+// Pricing is quoted per print size, so the card advertises the cheapest size.
+function priceSummary(product) {
+  const sizes = product.sizes || [];
+  if (!sizes.length) return `From R${product.startsFrom || product.basePrice || 0}`;
+  const cheapest = sizes.reduce((min, s) => (s.startPrice < min.startPrice ? s : min), sizes[0]);
+  return `${cheapest.label} from R${cheapest.startPrice}`;
 }
 
 // ============ MODAL ============
@@ -164,31 +178,61 @@ function showProductModal(productId) {
   modalProductName.textContent = product.name;
   modalProductDescription.textContent = product.description || 'Custom branding and printing service';
 
-  // Set image
-  if (product.image || product.imageUrl) {
-    modalProductImage.src = product.image || product.imageUrl;
+  // Set image, plus a thumbnail strip when the product has more than one picture
+  const images = (product.images && product.images.length)
+    ? product.images.map(i => i.url)
+    : [product.image || product.imageUrl].filter(Boolean);
+
+  if (images.length) {
+    modalProductImage.src = images[0];
     modalProductImage.style.display = 'block';
     modalPlaceholderImage.style.display = 'none';
     modalProductImage.onerror = () => {
       modalProductImage.style.display = 'none';
       modalPlaceholderImage.style.display = 'block';
     };
+  } else {
+    modalProductImage.style.display = 'none';
+    modalPlaceholderImage.style.display = 'block';
   }
 
-  // Set pricing table
-  if (product.pricingTiers && Array.isArray(product.pricingTiers) && product.pricingTiers.length) {
-    pricingTable.innerHTML = `
+  const thumbs = document.getElementById('modalThumbnails');
+  if (thumbs) {
+    thumbs.innerHTML = images.length > 1
+      ? images.map((url, i) => `<img src="${url}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${url}">`).join('')
+      : '';
+    thumbs.querySelectorAll('.thumb').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        modalProductImage.src = thumb.dataset.url;
+        modalProductImage.style.display = 'block';
+        modalPlaceholderImage.style.display = 'none';
+        thumbs.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+        thumb.classList.add('active');
+      });
+    });
+  }
+
+  // Set pricing table — priced by print size, not by quantity
+  const sizes = product.sizes || [];
+  pricingTable.innerHTML = sizes.length
+    ? `
       <tr>
-        <th>Quantity</th>
-        <th>Price</th>
+        <th>Print Size</th>
+        <th>Starting Price</th>
       </tr>
-      ${product.pricingTiers.map(p => `
+      ${sizes.map(s => `
         <tr>
-          <td>${p.quantityMax ? `${p.quantityMin}-${p.quantityMax}` : `${p.quantityMin}+`}</td>
-          <td>R${p.price}</td>
+          <td>${s.label}</td>
+          <td>From R${s.startPrice}</td>
         </tr>
       `).join('')}
-    `;
+    `
+    : '<tr><td>Contact us for pricing on this item.</td></tr>';
+
+  const noteEl = document.getElementById('modalPricingNote');
+  if (noteEl) {
+    noteEl.textContent = product.pricingNote || '';
+    noteEl.style.display = product.pricingNote ? 'block' : 'none';
   }
 
   // Set specs

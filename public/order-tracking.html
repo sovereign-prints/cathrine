@@ -330,6 +330,32 @@
             margin-top: 12px;
         }
 
+        /* Reference images the customer attached to their quote request */
+        .attachments {
+            margin-bottom: 12px;
+        }
+
+        .attachments-label {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 6px;
+        }
+
+        .attachment-thumbs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .attachment-thumbs img {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            display: block;
+        }
+
         .action-btn {
             flex: 1 1 130px;
             padding: 12px 10px;
@@ -980,6 +1006,24 @@ function quoteLineItems(quote) {
         .map(m => ({ name: m[1], qty: parseFloat(m[2]), price: parseFloat(m[3]) }));
 }
 
+// Reference images the customer attached to their request.
+function attachmentStrip(quote) {
+    const files = quote.attachments || [];
+    if (!files.length) return '';
+    return `
+        <div class="attachments">
+            <div class="attachments-label">📎 ${files.length} customer image${files.length > 1 ? 's' : ''}</div>
+            <div class="attachment-thumbs">
+                ${files.map(f => `
+                    <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener" title="${escapeHtml(f.filename || 'attachment')}">
+                        <img src="${escapeHtml(f.url)}" alt="${escapeHtml(f.filename || 'Attachment')}">
+                    </a>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
 function showMessage(text, type) {
     const box = document.getElementById('msgBox');
     box.textContent = text;
@@ -999,6 +1043,19 @@ function toDateInput(date) {
 }
 
 // ============ DATA ============
+
+// This page is admin-only; without a session send the user to the login screen
+// rather than showing empty lists and a pile of failed requests.
+async function requireAdmin() {
+    try {
+        const res = await fetch('/api/admin/session');
+        if (res.ok) return true;
+    } catch (e) {
+        // fall through to the redirect
+    }
+    window.location.href = 'admin.html';
+    return false;
+}
 
 async function loadData() {
     await Promise.all([loadQuotes(), loadOrders()]);
@@ -1265,6 +1322,7 @@ function displayQuotes() {
                 <div>📝 ${escapeHtml(q.description || 'No description')}</div>
                 <div>🔖 ${escapeHtml(q.referenceNumber)}</div>
             </div>
+            ${attachmentStrip(q)}
             <div class="card-actions">
                 <button class="action-btn" onclick="editQuote(${q.id})">✏️ Edit</button>
                 <button class="action-btn" onclick="printSavedQuote(${q.id})">🖨️ Print</button>
@@ -1311,6 +1369,7 @@ function renderOrderSources() {
                 <div>📝 ${escapeHtml(q.description || 'No description')}</div>
                 <div>🔖 ${escapeHtml(q.referenceNumber)}</div>
             </div>
+            ${attachmentStrip(q)}
             <div class="card-actions">
                 <button class="action-btn primary" onclick="openCreateOrderModal(${q.id})">📋 Review &amp; Create Order</button>
             </div>
@@ -1873,7 +1932,7 @@ function printInvoice(orderId) {
 // ============ STARTUP ============
 
 resetQuoteForm();
-loadData();
+requireAdmin().then(ok => { if (ok) loadData(); });
 </script>
 
 </body>
