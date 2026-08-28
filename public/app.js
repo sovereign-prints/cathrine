@@ -208,3 +208,39 @@ document.addEventListener('click', (e) => {
 setTimeout(() => {
   loadFooterServices();
 }, 100);
+
+// ============ CONTACT DETAILS ============
+// The phone number is deliberately never printed on the page. It is only ever
+// written into the WhatsApp link's href, so the site shows a button rather than
+// a number. All of these values come from the admin Settings page.
+
+async function loadContactDetails() {
+  let settings = {};
+  try {
+    const res = await fetch('/api/settings');
+    if (res.ok) settings = (await res.json()).settings || {};
+  } catch (e) {
+    return; // leave the markup as-is if settings can't be reached
+  }
+
+  const waNumber = (settings.whatsappNumber || '').replace(/[^0-9]/g, '');
+
+  document.querySelectorAll('a[href*="wa.me"]').forEach(link => {
+    if (!waNumber) {
+      link.style.display = 'none';
+      return;
+    }
+    const existing = link.getAttribute('href') || '';
+    const query = existing.includes('?') ? existing.slice(existing.indexOf('?')) : '';
+    link.setAttribute('href', `https://wa.me/${waNumber}${query}`);
+  });
+
+  document.querySelectorAll('[data-contact-email]').forEach(el => {
+    el.textContent = settings.businessEmail ? `✉️ ${settings.businessEmail}` : '';
+  });
+  document.querySelectorAll('[data-contact-location]').forEach(el => {
+    el.textContent = settings.businessLocation ? `📍 ${settings.businessLocation}` : '';
+  });
+}
+
+loadContactDetails();

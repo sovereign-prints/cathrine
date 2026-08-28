@@ -933,7 +933,12 @@
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input type="tel" id="businessPhone" required>
+                <input type="tel" id="businessPhone">
+              </div>
+              <div class="form-group">
+                <label>WhatsApp Number</label>
+                <input type="tel" id="whatsappNumber" placeholder="27840272369">
+                <small style="color:#888;">Country code, no spaces or +. This is not shown on the site &mdash; it only powers the WhatsApp button.</small>
               </div>
               <div class="form-group">
                 <label>Location/Address</label>
@@ -2028,7 +2033,7 @@
 
     // SETTINGS
     const SETTINGS_FIELDS = [
-      'businessName', 'businessEmail', 'businessPhone', 'businessLocation', 'businessTagline',
+      'businessName', 'businessEmail', 'businessPhone', 'businessLocation', 'businessTagline', 'whatsappNumber',
       'bankName', 'bankAccountNumber', 'bankAccountHolder',
       'taxLabel', 'taxRate', 'taxNumber', 'quoteValidDays'
     ];

@@ -282,6 +282,7 @@ const DEFAULT_SETTINGS = {
   businessName: 'Sovereign Prints',
   businessEmail: '',
   businessPhone: '',
+  whatsappNumber: '',
   businessLocation: '',
   businessTagline: 'You bring it. We brand it.',
   bankName: 'FNB',
