@@ -987,7 +987,8 @@ async function loadSettings() {
     calculateQuoteTotal();
 }
 
-let quotes = [];
+let quotes = [];      // quotes still awaiting conversion (shown in the list)
+let allQuotes = [];   // every quote, including converted ones, for reprinting
 let orders = [];
 let editingQuoteId = null;   // quote currently loaded into the builder
 let modalQuote = null;       // quote being reviewed in the create-order modal (null = blank order)
@@ -1087,10 +1088,13 @@ async function loadQuotes() {
         const res = await fetch('/api/admin/quotes');
         if (!res.ok) throw new Error('Failed to load quotes');
         const all = await res.json();
-        // A quote stays available until it is explicitly converted or dismissed.
+        // Every quote is kept in memory — a converted quote must still be
+        // printable from the order it produced. The list below just hides them.
+        allQuotes = all;
         quotes = all.filter(q => !['converted', 'dismissed', 'cancelled'].includes(q.status));
     } catch (e) {
         console.error('Error loading quotes:', e);
+        allQuotes = [];
         quotes = [];
     }
     displayQuotes();
@@ -1555,7 +1559,8 @@ function displayOrders() {
                 </div>
                 <div class="card-actions">
                     <button class="action-btn" onclick="editOrder(${o.id})">✏️ Edit</button>
-                    ${o.status === 'complete' ? `<button class="action-btn" onclick="printInvoice(${o.id})">🖨️ Invoice</button>` : ''}
+                    <button class="action-btn" onclick="printOrderQuote(${o.id})">🖨️ Quote</button>
+                    ${o.status === 'complete' ? `<button class="action-btn" onclick="printInvoice(${o.id})">🧾 Invoice</button>` : ''}
                     <button class="action-btn" onclick="deleteOrder(${o.id})">🗑️ Delete</button>
                 </div>
             </div>
@@ -1712,8 +1717,11 @@ function printQuoteFromForm() {
 }
 
 function printSavedQuote(id) {
-    const quote = quotes.find(q => q.id === id);
-    if (!quote) return;
+    const quote = allQuotes.find(q => q.id === id) || quotes.find(q => q.id === id);
+    if (!quote) {
+        showMessage('Could not find that quote.', 'error');
+        return;
+    }
 
     const items = quoteLineItems(quote);
     const subtotal = quote.subtotal || items.reduce((sum, it) => sum + it.qty * it.price, 0);
@@ -1910,6 +1918,44 @@ function renderQuotePdf(data) {
             <div class="signature">Sovereign Prints</div>
         </div>
     `);
+}
+
+// An order can always produce a quote document, whether or not the original
+// quote record still exists. If the order came from a quote we print that; if it
+// was a blank order we build the same document from the order's own line items.
+function printOrderQuote(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    if (order.quoteId) {
+        const source = allQuotes.find(q => q.id === order.quoteId);
+        if (source) {
+            printSavedQuote(source.id);
+            return;
+        }
+    }
+
+    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+    const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    if (!items.length) {
+        items = [{
+            name: order.projectName || order.serviceType || 'Service',
+            qty: 1,
+            price: fallbackTotal
+        }];
+    }
+    const subtotal = items.reduce((sum, it) => sum + it.qty * it.price, 0) || fallbackTotal;
+
+    renderQuotePdf({
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        description: order.description,
+        notes: order.notes,
+        items,
+        totals: { subtotal, tax: 0, total: subtotal },
+        validUntil: daysFromNow(parseInt(businessSettings.quoteValidDays) || 7)
+    });
 }
 
 function printInvoice(orderId) {
