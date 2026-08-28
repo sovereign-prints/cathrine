@@ -925,26 +925,74 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Business Name</label>
-                <input type="text" id="businessName" value="Sovereign Prints" required>
+                <input type="text" id="businessName" required>
               </div>
               <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" id="businessEmail" value="hello@sovereignprints.co.za" required>
+                <input type="email" id="businessEmail" required>
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input type="tel" id="businessPhone" value="+27 (0) 12 345 6789" required>
+                <input type="tel" id="businessPhone" required>
               </div>
               <div class="form-group">
                 <label>Location/Address</label>
-                <input type="text" id="businessLocation" value="Johannesburg, South Africa" required>
+                <input type="text" id="businessLocation" required>
               </div>
             </div>
             <div class="form-group">
               <label>Tagline</label>
-              <input type="text" id="businessTagline" value="You bring it. We brand it." required>
+              <input type="text" id="businessTagline">
             </div>
+
+            <h2 style="margin-top:32px;">Banking Details</h2>
+            <p style="color:#888;font-size:14px;margin-bottom:12px;">These appear on every quote and invoice.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Bank</label>
+                <input type="text" id="bankName">
+              </div>
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" id="bankAccountNumber">
+              </div>
+              <div class="form-group">
+                <label>Account Holder</label>
+                <input type="text" id="bankAccountHolder">
+              </div>
+            </div>
+
+            <h2 style="margin-top:32px;">Tax / VAT</h2>
+            <p style="color:#888;font-size:14px;margin-bottom:12px;">Leave this off unless the business is VAT registered. When it is off, no tax is added to quotes or invoices.</p>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" id="taxEnabled" style="width:auto;">
+                Add tax to quotes and invoices
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tax Label</label>
+                <input type="text" id="taxLabel" placeholder="VAT">
+              </div>
+              <div class="form-group">
+                <label>Tax Rate (%)</label>
+                <input type="number" id="taxRate" step="0.01" min="0" placeholder="15">
+              </div>
+              <div class="form-group">
+                <label>Tax / VAT Number</label>
+                <input type="text" id="taxNumber">
+              </div>
+            </div>
+
+            <h2 style="margin-top:32px;">Quotes</h2>
+            <div class="form-group">
+              <label>Quotes valid for (days)</label>
+              <input type="number" id="quoteValidDays" min="1">
+            </div>
+
             <button type="submit" class="btn btn-primary">Save Settings</button>
+            <div id="settingsMessage" style="margin-top:12px;"></div>
           </form>
         </div>
       </div>
@@ -1273,6 +1321,7 @@
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
       const tab = document.getElementById(tabName);
       if (tab) tab.classList.add('active');
+      if (tabName === 'settings') loadBusinessSettings();
     }
 
     // DATA LOADING
@@ -1978,10 +2027,50 @@
     }
 
     // SETTINGS
-    function saveBusinessSettings(e) {
+    const SETTINGS_FIELDS = [
+      'businessName', 'businessEmail', 'businessPhone', 'businessLocation', 'businessTagline',
+      'bankName', 'bankAccountNumber', 'bankAccountHolder',
+      'taxLabel', 'taxRate', 'taxNumber', 'quoteValidDays'
+    ];
+
+    async function loadBusinessSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const { settings } = await res.json();
+        SETTINGS_FIELDS.forEach(key => {
+          const el = document.getElementById(key);
+          if (el) el.value = settings[key] ?? '';
+        });
+        const taxToggle = document.getElementById('taxEnabled');
+        if (taxToggle) taxToggle.checked = settings.taxEnabled === 'true';
+      } catch (error) {
+        console.error('Could not load settings:', error);
+      }
+    }
+
+    async function saveBusinessSettings(e) {
       e.preventDefault();
-      // TODO: Implement settings save
-      alert('Settings saved! (functionality coming soon)');
+      const message = document.getElementById('settingsMessage');
+      const payload = {};
+      SETTINGS_FIELDS.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) payload[key] = el.value.trim();
+      });
+      payload.taxEnabled = document.getElementById('taxEnabled').checked ? 'true' : 'false';
+
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Save failed');
+        message.innerHTML = '<span style="color:#22c55e;">Settings saved.</span>';
+      } catch (error) {
+        message.innerHTML = '<span style="color:#ef4444;">Could not save settings. Please try again.</span>';
+      }
+      setTimeout(() => { message.innerHTML = ''; }, 4000);
     }
   </script>
 

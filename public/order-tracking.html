@@ -720,8 +720,11 @@
                         <label class="required" for="quoteService">Service Type</label>
                         <select id="quoteService" required>
                             <option value="">Select service</option>
-                            <option>Printing</option>
                             <option>Clothing</option>
+                            <option>Printing</option>
+                            <option>Vinyl Cut Out</option>
+                            <option>Stickers</option>
+                            <option>Printable Iron-On Sheet</option>
                             <option>Signage</option>
                             <option>Vehicle Branding</option>
                             <option>Custom</option>
@@ -744,8 +747,8 @@
                         <div>Subtotal</div>
                         <div id="subtotal">R 0.00</div>
                     </div>
-                    <div class="totals-row">
-                        <div>Tax (15%)</div>
+                    <div class="totals-row" style="display:none;">
+                        <div>Tax</div>
                         <div id="tax">R 0.00</div>
                     </div>
                     <div class="totals-row total">
@@ -849,8 +852,11 @@
                         <label class="required" for="moService">Service Type</label>
                         <select id="moService" required>
                             <option value="">Select service</option>
-                            <option>Printing</option>
                             <option>Clothing</option>
+                            <option>Printing</option>
+                            <option>Vinyl Cut Out</option>
+                            <option>Stickers</option>
+                            <option>Printable Iron-On Sheet</option>
                             <option>Signage</option>
                             <option>Vehicle Branding</option>
                             <option>Custom</option>
@@ -873,8 +879,8 @@
                         <div>Subtotal</div>
                         <div id="moSubtotal">R 0.00</div>
                     </div>
-                    <div class="totals-row">
-                        <div>Tax (15%)</div>
+                    <div class="totals-row" style="display:none;">
+                        <div>Tax</div>
                         <div id="moTax">R 0.00</div>
                     </div>
                     <div class="totals-row total">
@@ -966,7 +972,44 @@
 </div>
 
 <script>
-const TAX_RATE = 0.15;
+// Tax comes from the Settings page. It is off by default, so nothing is added
+// to a quote unless the owner has switched VAT on.
+let businessSettings = {
+    businessName: 'Sovereign Prints', bankName: 'FNB',
+    bankAccountNumber: '', bankAccountHolder: '',
+    taxEnabled: 'false', taxLabel: 'VAT', taxRate: '0', taxNumber: ''
+};
+function taxRate() {
+    if (businessSettings.taxEnabled !== 'true') return 0;
+    return (parseFloat(businessSettings.taxRate) || 0) / 100;
+}
+function taxLabel() {
+    const pct = parseFloat(businessSettings.taxRate) || 0;
+    return `${businessSettings.taxLabel || 'Tax'} (${pct}%)`;
+}
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+            const data = await res.json();
+            businessSettings = { ...businessSettings, ...data.settings };
+        }
+    } catch (e) { /* keep the safe defaults */ }
+    applyTaxVisibility();
+    calculateQuoteTotal();
+}
+// Hide the tax row entirely when no tax is being charged.
+function applyTaxVisibility() {
+    const showing = taxRate() > 0;
+    ['tax', 'moTax'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.parentElement) {
+            el.parentElement.style.display = showing ? '' : 'none';
+            const label = el.parentElement.firstElementChild;
+            if (label && showing) label.textContent = taxLabel();
+        }
+    });
+}
 
 let quotes = [];
 let orders = [];
@@ -1165,7 +1208,7 @@ function recalcTotals(containerId, ids) {
         subtotal += rowTotal;
     });
 
-    const tax = subtotal * TAX_RATE;
+    const tax = subtotal * taxRate();
     document.getElementById(ids.subtotal).textContent = money(subtotal);
     document.getElementById(ids.tax).textContent = money(tax);
     document.getElementById(ids.total).textContent = money(subtotal + tax);
@@ -1224,7 +1267,7 @@ function buildRequirements(items, totals, validUntil, notes) {
     return [
         ...items.map(it => `- ${it.name} x${it.qty} @ R${it.price.toFixed(2)}`),
         `Subtotal: ${money(totals.subtotal)}`,
-        `Tax (15%): ${money(totals.tax)}`,
+        totals.tax > 0 ? `${taxLabel()}: ${money(totals.tax)}` : null,
         `Total: ${money(totals.total)}`,
         `Valid until: ${validUntil.toLocaleDateString()}`,
         notes ? `Notes: ${notes}` : null
@@ -1475,6 +1518,10 @@ async function confirmCreateOrder() {
                 serviceType: service,
                 description,
                 quotedPrice: money(totals.total),
+                lineItems: items,
+                subtotal: totals.subtotal,
+                tax: totals.tax,
+                total: totals.total,
                 dueDate: deadline,
                 status: document.getElementById('moStatus').value,
                 notes: document.getElementById('moOrderNotes').value,
@@ -1693,7 +1740,7 @@ function printSavedQuote(id) {
 
     const items = quoteLineItems(quote);
     const subtotal = quote.subtotal || items.reduce((sum, it) => sum + it.qty * it.price, 0);
-    const tax = quote.tax || subtotal * TAX_RATE;
+    const tax = Number(quote.tax) || subtotal * taxRate();
 
     renderQuotePdf({
         customerName: quote.customerName,
@@ -1718,17 +1765,6 @@ function pdfStyles() {
             padding: 48px;
             position: relative;
             overflow: hidden;
-        }
-        body::before {
-            content: '';
-            position: absolute;
-            top: -120px;
-            right: -120px;
-            width: 360px;
-            height: 360px;
-            background: radial-gradient(circle, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0) 70%);
-            border-radius: 50%;
-            z-index: 0;
         }
         .page { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; }
@@ -1808,8 +1844,10 @@ function openPrintWindow(title, bodyHtml) {
     setTimeout(() => printWindow.print(), 400);
 }
 
-function renderQuotePdf(data) {
-    const rowsHtml = data.items.map(it => `
+// One renderer for the line item table means an invoice always shows the same
+// descriptions, quantities and prices as the quote it came from.
+function docItemsTable(items, totals) {
+    const rowsHtml = items.map(it => `
         <tr>
             <td>${escapeHtml(it.name)}</td>
             <td style="text-align:center;">${it.qty}</td>
@@ -1817,6 +1855,36 @@ function renderQuotePdf(data) {
             <td style="text-align:right;">${money(it.qty * it.price)}</td>
         </tr>
     `).join('');
+
+    const taxRow = totals.tax > 0
+        ? `<tr><td colspan="3" style="text-align:right;color:#a3a7c2;">${taxLabel()}</td><td style="text-align:right;">${money(totals.tax)}</td></tr>`
+        : '';
+
+    return `
+        <table>
+            <thead>
+                <tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+                <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Subtotal</td><td style="text-align:right;">${money(totals.subtotal)}</td></tr>
+                ${taxRow}
+            </tbody>
+        </table>`;
+}
+
+function docBankBox() {
+    return `
+        <div class="bank-box">
+            <strong>Bank Information</strong>
+            <div>${escapeHtml(businessSettings.bankName || '')}</div>
+            <div>${escapeHtml(businessSettings.bankAccountNumber || '')}</div>
+            <div>${escapeHtml(businessSettings.bankAccountHolder || '')}</div>
+            ${businessSettings.taxNumber ? `<div style="margin-top:6px;color:#a3a7c2;">VAT No: ${escapeHtml(businessSettings.taxNumber)}</div>` : ''}
+        </div>`;
+}
+
+function renderQuotePdf(data) {
 
     openPrintWindow(`Quote - ${data.customerName}`, `
         <div class="page">
@@ -1839,24 +1907,10 @@ function renderQuotePdf(data) {
                 ${data.description ? `<div style="margin-top:8px;font-size:13px;color:#eceef5;">${escapeHtml(data.description)}</div>` : ''}
             </div>
 
-            <table>
-                <thead>
-                    <tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                    <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Subtotal</td><td style="text-align:right;">${money(data.totals.subtotal)}</td></tr>
-                    <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Tax (15%)</td><td style="text-align:right;">${money(data.totals.tax)}</td></tr>
-                </tbody>
-            </table>
+            ${docItemsTable(data.items, data.totals)}
 
             <div class="bottom-row">
-                <div class="bank-box">
-                    <strong>Bank Information</strong>
-                    <div>FNB</div>
-                    <div>62379192637</div>
-                    <div>Cathrine Nel</div>
-                </div>
+                ${docBankBox()}
                 <div class="total-box">
                     <strong>Total Due</strong>
                     <div class="amount">${money(data.totals.total)}</div>
@@ -1874,7 +1928,27 @@ function printInvoice(orderId) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    const total = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    // Invoices are built from the line items the order was quoted from, so the
+    // wording, quantities and prices match the quote the customer accepted.
+    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+    if (!items.length && order.quoteId) {
+        const sourceQuote = quotes.find(q => q.id === order.quoteId);
+        if (sourceQuote) items = quoteLineItems(sourceQuote);
+    }
+
+    const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    if (!items.length) {
+        items = [{
+            name: order.projectName || order.serviceType || 'Service',
+            qty: 1,
+            price: fallbackTotal
+        }];
+    }
+
+    const subtotal = Number(order.subtotal) || items.reduce((sum, it) => sum + it.qty * it.price, 0);
+    const tax = Number(order.tax) || subtotal * taxRate();
+    const total = Number(order.total) || fallbackTotal || subtotal + tax;
+    const totals = { subtotal, tax, total };
 
     openPrintWindow(`Invoice - ${order.customerName}`, `
         <div class="page">
@@ -1897,25 +1971,12 @@ function printInvoice(orderId) {
                 <span class="paid-badge">COMPLETE</span>
             </div>
 
-            <table>
-                <thead>
-                    <tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${escapeHtml(order.projectName || order.serviceType || 'Service')}${order.description ? `<div style="color:#a3a7c2;font-size:12px;margin-top:4px;">${escapeHtml(order.description)}</div>` : ''}</td>
-                        <td style="text-align:right;">${money(total)}</td>
-                    </tr>
-                </tbody>
-            </table>
+            ${order.description ? `<div class="section" style="font-size:13px;color:#eceef5;">${escapeHtml(order.description)}</div>` : ''}
+
+            ${docItemsTable(items, totals)}
 
             <div class="bottom-row">
-                <div class="bank-box">
-                    <strong>Bank Information</strong>
-                    <div>FNB</div>
-                    <div>62379192637</div>
-                    <div>Cathrine Nel</div>
-                </div>
+                ${docBankBox()}
                 <div class="total-box">
                     <strong>Total Due</strong>
                     <div class="amount">${money(total)}</div>
@@ -1932,7 +1993,7 @@ function printInvoice(orderId) {
 // ============ STARTUP ============
 
 resetQuoteForm();
-requireAdmin().then(ok => { if (ok) loadData(); });
+requireAdmin().then(ok => { if (ok) { loadSettings(); loadData(); } });
 </script>
 
 </body>

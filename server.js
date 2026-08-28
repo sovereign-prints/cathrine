@@ -188,6 +188,10 @@ function mapProject(row) {
     status: row.status,
     notes: row.notes || '',
     quoteId: row.quote_id === null || row.quote_id === undefined ? null : Number(row.quote_id),
+    lineItems: Array.isArray(row.line_items) ? row.line_items : [],
+    subtotal: Number(row.subtotal || 0),
+    tax: Number(row.tax || 0),
+    total: Number(row.total || 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -942,6 +946,26 @@ app.post('/api/admin/templates/:id/generate', adminAuth, async (req, res) => {
 
 // ============ PROJECT TRACKING ROUTES ============
 
+// ============ BUSINESS SETTINGS ============
+// Public read: the customer site and the documents both need the contact and
+// banking details. Nothing secret is stored here.
+app.get('/api/settings', async (req, res) => {
+  try {
+    res.json({ settings: await db.getSettings() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
+  try {
+    const settings = await db.saveSettings(req.body || {});
+    res.json({ success: true, settings, message: 'Settings saved' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
 app.get('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
     const { rows } = await db.query('SELECT * FROM projects ORDER BY created_at DESC');
@@ -986,7 +1010,7 @@ app.get('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
 app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
-    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId } = req.body;
+    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId, lineItems, subtotal, tax, total } = req.body;
 
     if (!projectName || !customerName || !dueDate || !status) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -994,8 +1018,8 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
 
     const id = Date.now();
     const { rows } = await db.query(
-      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes, quote_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes, quote_id, line_items, subtotal, tax, total)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [
         id,
         projectName.trim(),
@@ -1008,7 +1032,11 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
         dueDate,
         status.toLowerCase(),
         notes?.trim() || '',
-        quoteId ? parseInt(quoteId) : null
+        quoteId ? parseInt(quoteId) : null,
+        JSON.stringify(Array.isArray(lineItems) ? lineItems : []),
+        Number(subtotal) || 0,
+        Number(tax) || 0,
+        Number(total) || 0
       ]
     );
 
@@ -1057,11 +1085,16 @@ app.patch('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
     const { rows } = await db.query(
       `UPDATE projects SET project_name = $1, customer_name = $2, customer_email = $3, customer_phone = $4,
-       service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10, updated_at = now()
-       WHERE id = $11 RETURNING *`,
+       service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10,
+       line_items = $11, subtotal = $12, tax = $13, total = $14, updated_at = now()
+       WHERE id = $15 RETURNING *`,
       [
         merged.project_name, merged.customer_name, merged.customer_email, merged.customer_phone,
         merged.service_type, merged.description, merged.quoted_price, merged.due_date, merged.status, merged.notes,
+        JSON.stringify(updates.hasOwnProperty('lineItems') && Array.isArray(updates.lineItems) ? updates.lineItems : (existing.line_items || [])),
+        updates.hasOwnProperty('subtotal') ? Number(updates.subtotal) || 0 : Number(existing.subtotal || 0),
+        updates.hasOwnProperty('tax') ? Number(updates.tax) || 0 : Number(existing.tax || 0),
+        updates.hasOwnProperty('total') ? Number(updates.total) || 0 : Number(existing.total || 0),
         projectId
       ]
     );

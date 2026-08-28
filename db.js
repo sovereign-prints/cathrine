@@ -154,6 +154,25 @@ async function initSchema() {
     ALTER TABLE products ADD COLUMN IF NOT EXISTS pricing_note TEXT DEFAULT '';
   `);
 
+  // Orders keep a copy of the line items they were quoted from, so an invoice
+  // reads exactly the same as the quote the customer accepted.
+  await query(`
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS line_items JSONB DEFAULT '[]';
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS tax NUMERIC DEFAULT 0;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS total NUMERIC DEFAULT 0;
+  `);
+
+  // Business details the owner edits from the Settings page. Simple key/value
+  // so a new setting never needs a migration.
+  await query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT DEFAULT ''
+    );
+  `);
+  await seedDefaultSettings();
+
   // Pricing is driven by print size (A5 from R50, A4 from R100, ...), not by
   // quantity. The legacy pricing_tiers table is left in place so nothing is
   // destroyed, but nothing reads from it any more.
@@ -257,4 +276,53 @@ async function seedDefaultTemplates() {
   }
 }
 
-module.exports = { pool, query, initSchema, DEFAULT_SIZES, DEFAULT_PRICING_NOTE };
+// Tax defaults to 0 — Sovereign Prints is not currently charging VAT. The owner
+// can switch it on from Settings if that ever changes.
+const DEFAULT_SETTINGS = {
+  businessName: 'Sovereign Prints',
+  businessEmail: '',
+  businessPhone: '',
+  businessLocation: '',
+  businessTagline: 'You bring it. We brand it.',
+  bankName: 'FNB',
+  bankAccountNumber: '62379192637',
+  bankAccountHolder: 'Cathrine Nel',
+  taxEnabled: 'false',
+  taxLabel: 'VAT',
+  taxRate: '0',
+  taxNumber: '',
+  quoteValidDays: '7'
+};
+
+async function seedDefaultSettings() {
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    await query(
+      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
+      [key, value]
+    );
+  }
+}
+
+async function getSettings() {
+  const { rows } = await query('SELECT key, value FROM settings');
+  const settings = { ...DEFAULT_SETTINGS };
+  rows.forEach(row => { settings[row.key] = row.value; });
+  return settings;
+}
+
+async function saveSettings(updates) {
+  for (const [key, value] of Object.entries(updates || {})) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) continue;
+    await query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [key, String(value ?? '')]
+    );
+  }
+  return getSettings();
+}
+
+module.exports = {
+  pool, query, initSchema, DEFAULT_SIZES, DEFAULT_PRICING_NOTE,
+  DEFAULT_SETTINGS, getSettings, saveSettings
+};
