@@ -284,6 +284,29 @@
             flex-wrap: wrap;
         }
 
+        /* The collapsed order heading is the tap target, so give it a
+           comfortable height and make it obviously interactive. */
+        .order-summary {
+            cursor: pointer;
+            min-height: 48px;
+            align-items: center;
+            margin-bottom: 0;
+            padding: 4px 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .order-summary:active { opacity: 0.65; }
+        .chevron {
+            font-size: 12px;
+            color: var(--text-light);
+            flex: 0 0 auto;
+        }
+        .order-details { margin-top: 12px; }
+        .badge-overdue {
+            background: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            margin-left: 6px;
+        }
+
         .card-title {
             font-size: 16px;
             font-weight: 600;
@@ -1524,27 +1547,32 @@ async function confirmCreateOrder() {
     }
 }
 
-function displayOrders() {
-    const container = document.getElementById('ordersList');
-    if (!orders.length) {
-        container.innerHTML = '<div class="empty-state">No orders yet. Create one from the list above.</div>';
-        return;
-    }
+// Orders render collapsed — heading only. Details and the status control appear
+// when a card is tapped, so a long list stays scannable on a phone.
+const expandedOrders = new Set();
 
+function orderCardHtml(o) {
     const statusOptions = ['quoted', 'processing', 'complete', 'delivered', 'on-hold', 'cancelled'];
+    const isOverdue = o.dueDate && new Date(o.dueDate) < new Date()
+        && !['complete', 'delivered', 'cancelled'].includes(o.status);
+    const open = expandedOrders.has(o.id);
 
-    container.innerHTML = orders.map(o => {
-        const isOverdue = o.dueDate && new Date(o.dueDate) < new Date()
-            && !['complete', 'delivered', 'cancelled'].includes(o.status);
-        return `
-            <div class="card ${escapeHtml(o.status)}">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">${escapeHtml(o.projectName)}</div>
-                        <span class="badge badge-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
-                    </div>
-                    <div class="card-amount">${escapeHtml(o.quotedPrice || '-')}</div>
+    return `
+        <div class="card ${escapeHtml(o.status)}" data-order-id="${o.id}">
+            <div class="card-header order-summary" onclick="toggleOrder(${o.id})"
+                 role="button" tabindex="0" aria-expanded="${open}">
+                <div>
+                    <div class="card-title">${escapeHtml(o.projectName)}</div>
+                    <span class="badge badge-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
+                    ${isOverdue ? '<span class="badge badge-overdue">⚠️ OVERDUE</span>' : ''}
                 </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="card-amount">${escapeHtml(o.quotedPrice || '-')}</div>
+                    <span class="chevron">${open ? '▲' : '▼'}</span>
+                </div>
+            </div>
+
+            <div class="order-details" style="display:${open ? 'block' : 'none'};">
                 <div class="card-info">
                     <div>👤 ${escapeHtml(o.customerName)}</div>
                     <div>📅 Due: ${escapeHtml(o.dueDate || '-')} ${isOverdue ? '⚠️ OVERDUE' : ''}</div>
@@ -1553,7 +1581,7 @@ function displayOrders() {
                 <div class="form-group" style="margin-top:10px;">
                     <label>Progress Status</label>
                     <select onchange="changeOrderStatus(${o.id}, this.value)">
-                        ${statusOptions.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s.toUpperCase()}</option>`).join('')}
+                        ${statusOptions.map(st => `<option value="${st}" ${o.status === st ? 'selected' : ''}>${st.toUpperCase()}</option>`).join('')}
                     </select>
                     ${o.status !== 'complete' ? '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">Set status to COMPLETE to generate an invoice.</div>' : ''}
                 </div>
@@ -1564,8 +1592,45 @@ function displayOrders() {
                     <button class="action-btn" onclick="deleteOrder(${o.id})">🗑️ Delete</button>
                 </div>
             </div>
-        `;
-    }).join('');
+        </div>
+    `;
+}
+
+function toggleOrder(id) {
+    if (expandedOrders.has(id)) expandedOrders.delete(id);
+    else expandedOrders.add(id);
+
+    const card = document.querySelector(`[data-order-id="${id}"]`);
+    if (!card) return;
+    const details = card.querySelector('.order-details');
+    const chevron = card.querySelector('.chevron');
+    const open = expandedOrders.has(id);
+    details.style.display = open ? 'block' : 'none';
+    chevron.textContent = open ? '▲' : '▼';
+    card.querySelector('.order-summary').setAttribute('aria-expanded', open);
+}
+
+function displayOrders() {
+    const container = document.getElementById('ordersList');
+    if (!orders.length) {
+        expandedOrders.clear();
+        container.innerHTML = '<div class="empty-state">No orders yet. Create one from the list above.</div>';
+        return;
+    }
+    // Forget any cards whose orders no longer exist.
+    const ids = new Set(orders.map(o => o.id));
+    [...expandedOrders].forEach(id => { if (!ids.has(id)) expandedOrders.delete(id); });
+
+    container.innerHTML = orders.map(orderCardHtml).join('');
+}
+
+// Redraws a single card in place. Nothing else on the page moves, so the view
+// stays exactly where the user left it.
+function refreshOrderCard(id) {
+    const order = orders.find(o => o.id === id);
+    const card = document.querySelector(`[data-order-id="${id}"]`);
+    if (!order || !card) { displayOrders(); return; }
+    card.outerHTML = orderCardHtml(order);
 }
 
 function editOrder(id) {
@@ -1626,10 +1691,20 @@ async function changeOrderStatus(id, status) {
             body: JSON.stringify({ status })
         });
         if (!res.ok) throw new Error('Server rejected the request');
+        const data = await res.json().catch(() => null);
+
+        // Update this one card in place rather than rebuilding the whole list,
+        // which used to throw the page back to the top.
+        const order = orders.find(o => o.id === id);
+        if (order) {
+            Object.assign(order, data && data.project ? data.project : { status });
+            expandedOrders.add(id);
+            refreshOrderCard(id);
+        }
         showMessage('✅ Status updated', 'success');
-        await loadOrders();
     } catch (e) {
         showMessage('❌ Could not update status: ' + e.message, 'error');
+        await loadOrders();
     }
 }
 
