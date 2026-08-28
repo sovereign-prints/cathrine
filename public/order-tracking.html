@@ -1588,7 +1588,7 @@ function orderCardHtml(o) {
                 <div class="card-actions">
                     <button class="action-btn" onclick="editOrder(${o.id})">✏️ Edit</button>
                     <button class="action-btn" onclick="printOrderQuote(${o.id})">🖨️ Quote</button>
-                    ${o.status === 'complete' ? `<button class="action-btn" onclick="printInvoice(${o.id})">🧾 Invoice</button>` : ''}
+                    ${['complete', 'delivered'].includes(o.status) ? `<button class="action-btn" onclick="printInvoice(${o.id})">🧾 Invoice</button>` : ''}
                     <button class="action-btn" onclick="deleteOrder(${o.id})">🗑️ Delete</button>
                 </div>
             </div>
@@ -1902,7 +1902,9 @@ function openPrintWindow(title, bodyHtml) {
     const frame = document.createElement('iframe');
     frame.id = 'printFrame';
     frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    // Positioned off-screen at a real size rather than 0x0 or visibility:hidden.
+    // Safari on iOS refuses to print a frame it considers invisible.
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:1100px;border:0;opacity:0;';
     document.body.appendChild(frame);
 
     const doc = frame.contentWindow.document;
@@ -1910,15 +1912,32 @@ function openPrintWindow(title, bodyHtml) {
     doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
     doc.close();
 
-    // Give images and the web font a moment to settle before opening the dialog.
-    setTimeout(() => {
+    let printed = false;
+    const doPrint = () => {
+        if (printed) return;
+        printed = true;
         try {
             frame.contentWindow.focus();
             frame.contentWindow.print();
         } catch (e) {
-            showMessage('⚠️ Could not open the print dialog on this device.', 'error');
+            // Some mobile browsers will not print from a frame at all. Fall back
+            // to a normal window so the document is never simply unavailable.
+            const win = window.open('', '_blank');
+            if (!win) {
+                showMessage('⚠️ Printing was blocked. Please allow pop-ups for this site and try again.', 'error');
+                return;
+            }
+            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 500);
         }
-    }, 600);
+    };
+
+    // Print once the frame's own load event fires, with a timeout as a backstop
+    // in case the web font or logo never resolves.
+    frame.onload = doPrint;
+    setTimeout(doPrint, 1200);
 }
 
 // One renderer for the line item table means an invoice always shows the same
@@ -2035,13 +2054,16 @@ function printOrderQuote(orderId) {
 
 function printInvoice(orderId) {
     const order = orders.find(o => o.id === orderId);
-    if (!order) return;
+    if (!order) {
+        showMessage('Could not find that order.', 'error');
+        return;
+    }
 
     // Invoices are built from the line items the order was quoted from, so the
     // wording, quantities and prices match the quote the customer accepted.
     let items = Array.isArray(order.lineItems) ? order.lineItems : [];
     if (!items.length && order.quoteId) {
-        const sourceQuote = quotes.find(q => q.id === order.quoteId);
+        const sourceQuote = allQuotes.find(q => q.id === order.quoteId) || quotes.find(q => q.id === order.quoteId);
         if (sourceQuote) items = quoteLineItems(sourceQuote);
     }
 
