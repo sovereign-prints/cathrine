@@ -748,10 +748,6 @@
                         <div>Subtotal</div>
                         <div id="subtotal">R 0.00</div>
                     </div>
-                    <div class="totals-row" style="display:none;">
-                        <div>Tax</div>
-                        <div id="tax">R 0.00</div>
-                    </div>
                     <div class="totals-row total">
                         <div>TOTAL</div>
                         <div id="quoteTotal">R 0.00</div>
@@ -881,10 +877,6 @@
                         <div>Subtotal</div>
                         <div id="moSubtotal">R 0.00</div>
                     </div>
-                    <div class="totals-row" style="display:none;">
-                        <div>Tax</div>
-                        <div id="moTax">R 0.00</div>
-                    </div>
                     <div class="totals-row total">
                         <div>TOTAL</div>
                         <div id="moTotal">R 0.00</div>
@@ -978,21 +970,12 @@
 let quoteDirty = false;
 function markQuoteDirty() { quoteDirty = true; }
 
-// Tax comes from the Settings page. It is off by default, so nothing is added
-// to a quote unless the owner has switched VAT on.
+// Sovereign Prints does not charge tax. Totals are the sum of the line items,
+// nothing more.
 let businessSettings = {
     businessName: 'Sovereign Prints', bankName: 'FNB',
-    bankAccountNumber: '', bankAccountHolder: '',
-    taxEnabled: 'false', taxLabel: 'VAT', taxRate: '0', taxNumber: ''
+    bankAccountNumber: '', bankAccountHolder: ''
 };
-function taxRate() {
-    if (businessSettings.taxEnabled !== 'true') return 0;
-    return (parseFloat(businessSettings.taxRate) || 0) / 100;
-}
-function taxLabel() {
-    const pct = parseFloat(businessSettings.taxRate) || 0;
-    return `${businessSettings.taxLabel || 'Tax'} (${pct}%)`;
-}
 async function loadSettings() {
     try {
         const res = await fetch('/api/settings');
@@ -1001,20 +984,7 @@ async function loadSettings() {
             businessSettings = { ...businessSettings, ...data.settings };
         }
     } catch (e) { /* keep the safe defaults */ }
-    applyTaxVisibility();
     calculateQuoteTotal();
-}
-// Hide the tax row entirely when no tax is being charged.
-function applyTaxVisibility() {
-    const showing = taxRate() > 0;
-    ['tax', 'moTax'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.parentElement) {
-            el.parentElement.style.display = showing ? '' : 'none';
-            const label = el.parentElement.firstElementChild;
-            if (label && showing) label.textContent = taxLabel();
-        }
-    });
 }
 
 let quotes = [];
@@ -1214,11 +1184,9 @@ function recalcTotals(containerId, ids) {
         subtotal += rowTotal;
     });
 
-    const tax = subtotal * taxRate();
     document.getElementById(ids.subtotal).textContent = money(subtotal);
-    document.getElementById(ids.tax).textContent = money(tax);
-    document.getElementById(ids.total).textContent = money(subtotal + tax);
-    return { subtotal, tax, total: subtotal + tax };
+    document.getElementById(ids.total).textContent = money(subtotal);
+    return { subtotal, tax: 0, total: subtotal };
 }
 
 // ---- builder ----
@@ -1229,7 +1197,7 @@ function addLineItem(item) {
 }
 
 function calculateQuoteTotal() {
-    return recalcTotals('lineItemsContainer', { subtotal: 'subtotal', tax: 'tax', total: 'quoteTotal' });
+    return recalcTotals('lineItemsContainer', { subtotal: 'subtotal', total: 'quoteTotal' });
 }
 
 // ---- modal ----
@@ -1240,7 +1208,7 @@ function addModalLineItem(item) {
 }
 
 function calculateModalTotal() {
-    return recalcTotals('moLineItems', { subtotal: 'moSubtotal', tax: 'moTax', total: 'moTotal' });
+    return recalcTotals('moLineItems', { subtotal: 'moSubtotal', total: 'moTotal' });
 }
 
 // ============ QUOTE BUILDER ============
@@ -1273,7 +1241,6 @@ function buildRequirements(items, totals, validUntil, notes) {
     return [
         ...items.map(it => `- ${it.name} x${it.qty} @ R${it.price.toFixed(2)}`),
         `Subtotal: ${money(totals.subtotal)}`,
-        totals.tax > 0 ? `${taxLabel()}: ${money(totals.tax)}` : null,
         `Total: ${money(totals.total)}`,
         `Valid until: ${validUntil.toLocaleDateString()}`,
         notes ? `Notes: ${notes}` : null
@@ -1527,7 +1494,6 @@ async function confirmCreateOrder() {
                 quotedPrice: money(totals.total),
                 lineItems: items,
                 subtotal: totals.subtotal,
-                tax: totals.tax,
                 total: totals.total,
                 dueDate: deadline,
                 status: document.getElementById('moStatus').value,
@@ -1751,7 +1717,7 @@ function printSavedQuote(id) {
 
     const items = quoteLineItems(quote);
     const subtotal = quote.subtotal || items.reduce((sum, it) => sum + it.qty * it.price, 0);
-    const tax = Number(quote.tax) || subtotal * taxRate();
+
 
     renderQuotePdf({
         customerName: quote.customerName,
@@ -1760,7 +1726,7 @@ function printSavedQuote(id) {
         description: quote.description,
         notes: quote.notes,
         items,
-        totals: { subtotal, tax, total: quoteTotal(quote) || subtotal + tax },
+        totals: { subtotal, tax: 0, total: subtotal },
         validUntil: quote.validUntil ? new Date(quote.validUntil) : daysFromNow(7)
     });
 }
@@ -1884,10 +1850,6 @@ function docItemsTable(items, totals) {
         </tr>
     `).join('');
 
-    const taxRow = totals.tax > 0
-        ? `<tr><td colspan="3" style="text-align:right;color:#a3a7c2;">${taxLabel()}</td><td style="text-align:right;">${money(totals.tax)}</td></tr>`
-        : '';
-
     return `
         <table>
             <thead>
@@ -1896,7 +1858,6 @@ function docItemsTable(items, totals) {
             <tbody>
                 ${rowsHtml}
                 <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Subtotal</td><td style="text-align:right;">${money(totals.subtotal)}</td></tr>
-                ${taxRow}
             </tbody>
         </table>`;
 }
@@ -1908,7 +1869,6 @@ function docBankBox() {
             <div>${escapeHtml(businessSettings.bankName || '')}</div>
             <div>${escapeHtml(businessSettings.bankAccountNumber || '')}</div>
             <div>${escapeHtml(businessSettings.bankAccountHolder || '')}</div>
-            ${businessSettings.taxNumber ? `<div style="margin-top:6px;color:#a3a7c2;">VAT No: ${escapeHtml(businessSettings.taxNumber)}</div>` : ''}
         </div>`;
 }
 
@@ -1973,10 +1933,8 @@ function printInvoice(orderId) {
         }];
     }
 
-    const subtotal = Number(order.subtotal) || items.reduce((sum, it) => sum + it.qty * it.price, 0);
-    const tax = Number(order.tax) || subtotal * taxRate();
-    const total = Number(order.total) || fallbackTotal || subtotal + tax;
-    const totals = { subtotal, tax, total };
+    const subtotal = items.reduce((sum, it) => sum + it.qty * it.price, 0) || fallbackTotal;
+    const totals = { subtotal, tax: 0, total: subtotal };
 
     openPrintWindow(`Invoice - ${order.customerName}`, `
         <div class="page">

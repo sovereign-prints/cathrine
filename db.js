@@ -163,6 +163,13 @@ async function initSchema() {
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS total NUMERIC DEFAULT 0;
   `);
 
+  // Tax was previously added to quotes and orders. It is no longer charged, so
+  // clear it from existing records and restate their totals as the subtotal.
+  await query(`
+    UPDATE quotes SET tax = 0, total = subtotal WHERE tax IS NOT NULL AND tax <> 0;
+    UPDATE projects SET tax = 0, total = subtotal WHERE tax IS NOT NULL AND tax <> 0;
+  `);
+
   // Business details the owner edits from the Settings page. Simple key/value
   // so a new setting never needs a migration.
   await query(`
@@ -171,6 +178,7 @@ async function initSchema() {
       value TEXT DEFAULT ''
     );
   `);
+  await query(`DELETE FROM settings WHERE key IN ('taxEnabled','taxLabel','taxRate','taxNumber');`);
   await seedDefaultSettings();
 
   // Pricing is driven by print size (A5 from R50, A4 from R100, ...), not by
@@ -276,8 +284,7 @@ async function seedDefaultTemplates() {
   }
 }
 
-// Tax defaults to 0 — Sovereign Prints is not currently charging VAT. The owner
-// can switch it on from Settings if that ever changes.
+// Sovereign Prints does not charge tax, so no tax settings are stored.
 const DEFAULT_SETTINGS = {
   businessName: 'Sovereign Prints',
   businessEmail: '',
@@ -288,10 +295,6 @@ const DEFAULT_SETTINGS = {
   bankName: 'FNB',
   bankAccountNumber: '62379192637',
   bankAccountHolder: 'Cathrine Nel',
-  taxEnabled: 'false',
-  taxLabel: 'VAT',
-  taxRate: '0',
-  taxNumber: '',
   quoteValidDays: '7'
 };
 

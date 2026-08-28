@@ -128,7 +128,7 @@ function mapQuote(row) {
 
 // Line items arrive from the quote builder as {name, qty, price}. Recomputing the
 // money here keeps the stored totals honest regardless of what the client sent.
-const TAX_RATE = 0.15;
+// Sovereign Prints does not charge tax, so a total is simply the line items.
 
 function normaliseLineItems(items) {
   return (Array.isArray(items) ? items : [])
@@ -142,8 +142,7 @@ function normaliseLineItems(items) {
 
 function priceLineItems(items) {
   const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
-  const tax = subtotal * TAX_RATE;
-  return { subtotal, tax, total: subtotal + tax };
+  return { subtotal, tax: 0, total: subtotal };
 }
 
 function mapGallery(row) {
@@ -1010,7 +1009,8 @@ app.get('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
 app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
-    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId, lineItems, subtotal, tax, total } = req.body;
+    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId, lineItems } = req.body;
+    const projectTotals = priceLineItems(normaliseLineItems(lineItems));
 
     if (!projectName || !customerName || !dueDate || !status) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -1033,10 +1033,10 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
         status.toLowerCase(),
         notes?.trim() || '',
         quoteId ? parseInt(quoteId) : null,
-        JSON.stringify(Array.isArray(lineItems) ? lineItems : []),
-        Number(subtotal) || 0,
-        Number(tax) || 0,
-        Number(total) || 0
+        JSON.stringify(normaliseLineItems(lineItems)),
+        projectTotals.subtotal,
+        0,
+        projectTotals.total
       ]
     );
 
@@ -1083,6 +1083,11 @@ app.patch('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
       }
     });
 
+    const patchedItems = normaliseLineItems(
+      updates.hasOwnProperty('lineItems') ? updates.lineItems : (existing.line_items || [])
+    );
+    const patchedTotals = priceLineItems(patchedItems);
+
     const { rows } = await db.query(
       `UPDATE projects SET project_name = $1, customer_name = $2, customer_email = $3, customer_phone = $4,
        service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10,
@@ -1091,10 +1096,10 @@ app.patch('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
       [
         merged.project_name, merged.customer_name, merged.customer_email, merged.customer_phone,
         merged.service_type, merged.description, merged.quoted_price, merged.due_date, merged.status, merged.notes,
-        JSON.stringify(updates.hasOwnProperty('lineItems') && Array.isArray(updates.lineItems) ? updates.lineItems : (existing.line_items || [])),
-        updates.hasOwnProperty('subtotal') ? Number(updates.subtotal) || 0 : Number(existing.subtotal || 0),
-        updates.hasOwnProperty('tax') ? Number(updates.tax) || 0 : Number(existing.tax || 0),
-        updates.hasOwnProperty('total') ? Number(updates.total) || 0 : Number(existing.total || 0),
+        JSON.stringify(patchedItems),
+        patchedTotals.subtotal,
+        0,
+        patchedTotals.total,
         projectId
       ]
     );

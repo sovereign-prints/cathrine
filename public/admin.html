@@ -967,29 +967,6 @@
               </div>
             </div>
 
-            <h2 style="margin-top:32px;">Tax / VAT</h2>
-            <p style="color:#888;font-size:14px;margin-bottom:12px;">Leave this off unless the business is VAT registered. When it is off, no tax is added to quotes or invoices.</p>
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:10px;">
-                <input type="checkbox" id="taxEnabled" style="width:auto;">
-                Add tax to quotes and invoices
-              </label>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Tax Label</label>
-                <input type="text" id="taxLabel" placeholder="VAT">
-              </div>
-              <div class="form-group">
-                <label>Tax Rate (%)</label>
-                <input type="number" id="taxRate" step="0.01" min="0" placeholder="15">
-              </div>
-              <div class="form-group">
-                <label>Tax / VAT Number</label>
-                <input type="text" id="taxNumber">
-              </div>
-            </div>
-
             <h2 style="margin-top:32px;">Quotes</h2>
             <div class="form-group">
               <label>Quotes valid for (days)</label>
@@ -2035,7 +2012,7 @@
     const SETTINGS_FIELDS = [
       'businessName', 'businessEmail', 'businessPhone', 'businessLocation', 'businessTagline', 'whatsappNumber',
       'bankName', 'bankAccountNumber', 'bankAccountHolder',
-      'taxLabel', 'taxRate', 'taxNumber', 'quoteValidDays'
+      'quoteValidDays'
     ];
 
     async function loadBusinessSettings() {
@@ -2047,8 +2024,6 @@
           const el = document.getElementById(key);
           if (el) el.value = settings[key] ?? '';
         });
-        const taxToggle = document.getElementById('taxEnabled');
-        if (taxToggle) taxToggle.checked = settings.taxEnabled === 'true';
       } catch (error) {
         console.error('Could not load settings:', error);
       }
@@ -2062,7 +2037,6 @@
         const el = document.getElementById(key);
         if (el) payload[key] = el.value.trim();
       });
-      payload.taxEnabled = document.getElementById('taxEnabled').checked ? 'true' : 'false';
 
       try {
         const res = await fetch('/api/admin/settings', {
