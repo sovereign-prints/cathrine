@@ -974,6 +974,10 @@
 </div>
 
 <script>
+// Tracks whether the quote form has unsaved edits.
+let quoteDirty = false;
+function markQuoteDirty() { quoteDirty = true; }
+
 // Tax comes from the Settings page. It is off by default, so nothing is added
 // to a quote unless the owner has switched VAT on.
 let businessSettings = {
@@ -1336,6 +1340,7 @@ function editQuote(id) {
 }
 
 function resetQuoteForm() {
+    quoteDirty = false;
     editingQuoteId = null;
     document.getElementById('quoteForm').reset();
     document.getElementById('lineItemsContainer').innerHTML = '';
@@ -1723,7 +1728,11 @@ function printQuoteFromForm() {
         showMessage('Please enter a customer name before printing', 'error');
         return;
     }
-    // Printing is a preview only — it never saves anything on its own.
+    // Printing is a preview only — it never saves anything on its own, so say
+    // so plainly rather than letting the user assume the print saved the quote.
+    if (quoteDirty) {
+        showMessage('Printing a preview — this quote is not saved yet. Tap “Save Quote” when you are done.', 'info');
+    }
     renderQuotePdf({
         customerName: quote.customerName,
         customerEmail: quote.customerEmail,
@@ -1834,16 +1843,33 @@ function pdfStyles() {
     `;
 }
 
+// Printing happens inside a hidden iframe rather than a new tab or window, so
+// this page — and anything typed into the quote form — is never navigated away
+// from. When the print dialog closes the user is still exactly where they were.
 function openPrintWindow(title, bodyHtml) {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        showMessage('⚠️ Your browser blocked the print window. Allow pop-ups for this site.', 'error');
-        return;
-    }
-    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 400);
+    const previous = document.getElementById('printFrame');
+    if (previous) previous.remove();
+
+    const frame = document.createElement('iframe');
+    frame.id = 'printFrame';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(frame);
+
+    const doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
+    doc.close();
+
+    // Give images and the web font a moment to settle before opening the dialog.
+    setTimeout(() => {
+        try {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+        } catch (e) {
+            showMessage('⚠️ Could not open the print dialog on this device.', 'error');
+        }
+    }, 600);
 }
 
 // One renderer for the line item table means an invoice always shows the same
@@ -1993,6 +2019,15 @@ function printInvoice(orderId) {
 }
 
 // ============ STARTUP ============
+
+document.addEventListener('input', e => {
+    if (e.target.closest('#quoteForm, #lineItemsContainer')) markQuoteDirty();
+});
+window.addEventListener('beforeunload', e => {
+    if (!quoteDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+});
 
 resetQuoteForm();
 requireAdmin().then(ok => { if (ok) { loadSettings(); loadData(); } });
