@@ -1,0 +1,72 @@
+From 7178f19b3abee97e054ab67e354de051d823571b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 14:11:02 +0000
+Subject: [PATCH] Fix CORS rejecting the admin panel's own same-origin requests
+
+Browsers send an Origin header on same-origin POST requests too. The
+allowlist introduced with the static site split did not include the web
+service's own origin, so the admin panel's login POST was rejected and the
+thrown error surfaced as a 500 -- which the admin UI reported to the user as
+an invalid password.
+
+- always allow a request whose Origin matches its own Host, so the admin
+  pages never depend on STATIC_SITE_ORIGINS being set
+- return origin:false for a disallowed origin instead of throwing, so an
+  unexpected origin simply gets no CORS headers rather than a 500
+- keep the allowlist and localhost behaviour unchanged
+
+Verified: a same-origin POST with a non-localhost Host returns 500 on the old
+code and 200 on the new; the allowlisted static origin still receives its
+Access-Control-Allow-Origin header; a foreign origin gets no CORS header and
+no error.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XHRkqpijyrVnGpHMk66YGP
+---
+ server.js | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
+
+diff --git a/server.js b/server.js
+index f9b4bee..be472a9 100644
+--- a/server.js
++++ b/server.js
+@@ -36,16 +36,27 @@ const allowedOrigins = (process.env.STATIC_SITE_ORIGINS || '')
+   .map(o => o.trim().replace(/\/$/, ''))
+   .filter(Boolean);
+ 
+-app.use(cors({
+-  origin(origin, callback) {
+-    if (!origin) return callback(null, true);
+-    if (allowedOrigins.length === 0) return callback(null, true);
+-    const normalized = origin.replace(/\/$/, '');
+-    if (allowedOrigins.includes(normalized)) return callback(null, true);
+-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return callback(null, true);
+-    return callback(new Error('Not allowed by CORS: ' + origin));
+-  }
++const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
++
++// Requests are allowed when they carry no Origin header (curl, server-to-server),
++// when the Origin is this service's own host (browsers send Origin on same-origin
++// POSTs too, so the admin pages depend on this), when the Origin is in the
++// allowlist, or when it is localhost for development. Anything else simply does
++// not receive CORS headers -- it is never turned into a 500.
++app.use(cors((req, callback) => {
++  const origin = req.headers.origin;
++  if (!origin) return callback(null, { origin: true });
++
++  const normalized = origin.replace(/\/$/, '');
++  const sameOrigin = Boolean(req.headers.host) && normalized === `${req.protocol}://${req.headers.host}`;
++  const allowed = sameOrigin
++    || allowedOrigins.length === 0
++    || allowedOrigins.includes(normalized)
++    || LOCALHOST.test(normalized);
++
++  callback(null, { origin: allowed ? origin : false });
+ }));
++
+ app.use(bodyParser.json());
+ app.use(bodyParser.urlencoded({ extended: true }));
+ app.use(cookieParser());
+-- 
+2.43.0
+
