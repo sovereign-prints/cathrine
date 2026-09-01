@@ -1,0 +1,790 @@
+From 998d382d701f9c25e27442297f3288165bddb24e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 13:17:45 +0000
+Subject: [PATCH 1/2] Split customer-facing site into a Render Static Site
+
+The customer pages (home, products, gallery, quote) are now built into ./dist
+and deployed as a Render Static Site, while the API, uploads and admin pages
+stay on the existing Node web service. All functionality is preserved.
+
+- add public/config.js: resolves the API origin at runtime, prefixes API and
+  media URLs, and repoints admin links at the web service
+- route all customer-facing fetches and image URLs through apiUrl()/mediaUrl()
+- restrict CORS to an allowlist configured via STATIC_SITE_ORIGINS
+- add build-static.sh and a two-service render.yaml blueprint
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XHRkqpijyrVnGpHMk66YGP
+---
+ build-static.sh      | 31 ++++++++++++++++++++++
+ public/app.js        |  4 +--
+ public/config.js     | 63 ++++++++++++++++++++++++++++++++++++++++++++
+ public/gallery.html  |  1 +
+ public/gallery.js    |  6 ++---
+ public/index.html    |  1 +
+ public/products.html |  1 +
+ public/products.js   |  8 +++---
+ public/quote.html    |  1 +
+ public/quote.js      |  6 ++---
+ render.yaml          | 35 ++++++++++++++++++++++++
+ server.js            | 23 +++++++++++++++-
+ 12 files changed, 167 insertions(+), 13 deletions(-)
+ create mode 100755 build-static.sh
+ create mode 100644 public/config.js
+
+diff --git a/build-static.sh b/build-static.sh
+new file mode 100755
+index 0000000..a6e9a14
+--- /dev/null
++++ b/build-static.sh
+@@ -0,0 +1,31 @@
++#!/usr/bin/env bash
++# Builds the customer-facing static site into ./dist for a Render Static Site.
++# The admin pages (admin.html, order-tracking.html) are deliberately excluded --
++# they stay on the Render Web Service together with the API.
++set -euo pipefail
++
++rm -rf dist
++mkdir -p dist
++
++PAGES=(index.html products.html gallery.html quote.html)
++ASSETS=(styles.css config.js app.js products.js gallery.js quote.js logo.png)
++
++for f in "${PAGES[@]}" "${ASSETS[@]}"; do
++  cp "public/$f" "dist/$f"
++done
++
++# The API host can be overridden at build time (set API_HOST in the Render
++# static service's environment). Otherwise the value in public/config.js is used.
++if [ -n "${API_HOST:-}" ]; then
++  HOST_NO_SLASH="${API_HOST%/}"
++  sed -i "s|var API_HOST = '[^']*';|var API_HOST = '${HOST_NO_SLASH}';|" dist/config.js
++  echo "API_HOST set to ${HOST_NO_SLASH}"
++fi
++
++cp -r public/images dist/images
++[ -d public/products_images ] && cp -r public/products_images dist/products_images
++
++# Anything not matched by a file falls back to the homepage.
++cp dist/index.html dist/404.html
++
++echo "Static site built into ./dist"
+diff --git a/public/app.js b/public/app.js
+index 8bcbc6f..68f8875 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -1,6 +1,6 @@
+ // ============ GLOBAL VARIABLES ============
+ 
+-const API_BASE = '/api';
++const API_BASE = (window.API_ORIGIN || '') + '/api';
+ let products = [];
+ let categories = [];
+ 
+@@ -217,7 +217,7 @@ setTimeout(() => {
+ async function loadContactDetails() {
+   let settings = {};
+   try {
+-    const res = await fetch('/api/settings');
++    const res = await fetch(apiUrl('/api/settings'));
+     if (res.ok) settings = (await res.json()).settings || {};
+   } catch (e) {
+     return; // leave the markup as-is if settings can't be reached
+diff --git a/public/config.js b/public/config.js
+new file mode 100644
+index 0000000..8c8a3e5
+--- /dev/null
++++ b/public/config.js
+@@ -0,0 +1,63 @@
++/*
++ * Runtime configuration.
++ *
++ * The customer-facing pages are deployed as a Render Static Site, while the
++ * API + admin remain a Render Web Service. Pages therefore need to know where
++ * the API lives. When the page is served by the API host itself (or locally),
++ * same-origin requests are used and API_ORIGIN stays empty.
++ */
++(function () {
++  // The Render Web Service that hosts the API, uploads and the admin pages.
++  var API_HOST = 'https://cathrine.onrender.com';
++
++  var host = window.location.hostname;
++  var pageIsLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
++  var apiIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/i.test(API_HOST);
++
++  // Use same-origin requests when this page is served by the API host itself
++  // (the web service serves admin.html and can serve the customer pages too),
++  // and when running locally against a production API_HOST -- so `npm start`
++  // on localhost never talks to the live API by accident.
++  var sameOrigin = window.location.origin === API_HOST || (pageIsLocal && !apiIsLocal);
++
++  var origin = sameOrigin ? '' : API_HOST;
++
++  // Paths that are served by the API host and must be prefixed when the page
++  // is served from the static site.
++  var REMOTE_PREFIXES = ['/api/', '/uploads/', '/gallery_images/', '/products_images/'];
++
++  window.API_ORIGIN = origin;
++
++  // Build an absolute URL for an API endpoint.
++  window.apiUrl = function (path) {
++    if (!path) return path;
++    if (/^https?:\/\//i.test(path)) return path;
++    return origin + path;
++  };
++
++  // Build an absolute URL for an image / uploaded file returned by the API.
++  window.mediaUrl = function (path) {
++    if (!path) return path;
++    if (/^(https?:)?\/\//i.test(path) || path.indexOf('data:') === 0) return path;
++    for (var i = 0; i < REMOTE_PREFIXES.length; i++) {
++      if (path.indexOf(REMOTE_PREFIXES[i]) === 0) return origin + path;
++    }
++    return path;
++  };
++
++  // The admin pages (admin.html, order-tracking.html) are served by the web
++  // service, not the static site. Rewrite links to them at page load.
++  var ADMIN_PAGES = ['admin.html', 'order-tracking.html'];
++  if (origin) {
++    document.addEventListener('DOMContentLoaded', function () {
++      document.querySelectorAll('a[href]').forEach(function (a) {
++        var href = a.getAttribute('href');
++        for (var i = 0; i < ADMIN_PAGES.length; i++) {
++          if (href === ADMIN_PAGES[i] || href === '/' + ADMIN_PAGES[i]) {
++            a.setAttribute('href', origin + '/' + ADMIN_PAGES[i]);
++          }
++        }
++      });
++    });
++  }
++})();
+diff --git a/public/gallery.html b/public/gallery.html
+index 70eb21e..a172da0 100644
+--- a/public/gallery.html
++++ b/public/gallery.html
+@@ -349,6 +349,7 @@
+     </div>
+   </footer>
+ 
++  <script src="config.js"></script>
+   <script src="app.js"></script>
+   <script src="gallery.js"></script>
+ </body>
+diff --git a/public/gallery.js b/public/gallery.js
+index d700840..e5ec77e 100644
+--- a/public/gallery.js
++++ b/public/gallery.js
+@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
+ async function loadGalleryItems() {
+   try {
+     // Fetch gallery items from server API endpoint
+-    const response = await fetch('/api/gallery');
++    const response = await fetch(apiUrl('/api/gallery'));
+     if (!response.ok) throw new Error('Failed to load gallery');
+     allGalleryItems = await response.json();
+     // Filter to only active items
+@@ -83,7 +83,7 @@ function displayGalleryItems() {
+   galleryGrid.innerHTML = filteredItems.map(item => `
+     <div class="gallery-item" data-gallery-id="${item.id}">
+       <div class="gallery-image">
+-        <img src="${item.image || item.imageUrl}" alt="${item.title}" style="width:100%; height:100%; object-fit:cover; display:block;">
++        <img src="${mediaUrl(item.image || item.imageUrl)}" alt="${item.title}" style="width:100%; height:100%; object-fit:cover; display:block;">
+       </div>
+       <div class="gallery-info">
+         <div class="gallery-category">${item.category}</div>
+@@ -151,7 +151,7 @@ function showLightbox(galleryId) {
+   const lightboxDescription = document.getElementById('lightboxDescription');
+ 
+   // Set image and info
+-  lightboxImage.src = item.image;
++  lightboxImage.src = mediaUrl(item.image);
+   lightboxImage.alt = item.title;
+   lightboxTitle.textContent = item.title;
+   lightboxDescription.textContent = item.description || 'Custom branding and printing services by Sovereign Prints';
+diff --git a/public/index.html b/public/index.html
+index 912d2d6..de496ae 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -124,6 +124,7 @@
+     </div>
+   </footer>
+ 
++  <script src="config.js"></script>
+   <script src="app.js"></script>
+ </body>
+ </html>
+diff --git a/public/products.html b/public/products.html
+index 142ecf7..4277bef 100644
+--- a/public/products.html
++++ b/public/products.html
+@@ -469,6 +469,7 @@
+     </div>
+   </footer>
+ 
++  <script src="config.js"></script>
+   <script src="app.js"></script>
+   <script src="products.js"></script>
+ </body>
+diff --git a/public/products.js b/public/products.js
+index 5c6b84c..49e2fa5 100644
+--- a/public/products.js
++++ b/public/products.js
+@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
+ async function loadProducts() {
+   try {
+     // Fetch products from server API endpoint
+-    const response = await fetch('/api/products');
++    const response = await fetch(apiUrl('/api/products'));
+     if (!response.ok) throw new Error('Failed to load products');
+     allProducts = await response.json();
+     // Filter to only active products
+@@ -85,7 +85,7 @@ function displayProducts() {
+     return `
+     <div class="product-card" data-product-id="${product.id}">
+       <div class="product-image">
+-        <img src="${product.image || product.imageUrl}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
++        <img src="${mediaUrl(product.image || product.imageUrl)}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
+         ${imageCount > 1 ? `<span class="image-count">📷 ${imageCount}</span>` : ''}
+       </div>
+       <div class="product-info">
+@@ -172,7 +172,7 @@ function showProductModal(productId) {
+     : [product.image || product.imageUrl].filter(Boolean);
+ 
+   if (images.length) {
+-    modalProductImage.src = images[0];
++    modalProductImage.src = mediaUrl(images[0]);
+     modalProductImage.style.display = 'block';
+     modalPlaceholderImage.style.display = 'none';
+     modalProductImage.onerror = () => {
+@@ -187,7 +187,7 @@ function showProductModal(productId) {
+   const thumbs = document.getElementById('modalThumbnails');
+   if (thumbs) {
+     thumbs.innerHTML = images.length > 1
+-      ? images.map((url, i) => `<img src="${url}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${url}">`).join('')
++      ? images.map((url, i) => `<img src="${mediaUrl(url)}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${mediaUrl(url)}">`).join('')
+       : '';
+     thumbs.querySelectorAll('.thumb').forEach(thumb => {
+       thumb.addEventListener('click', () => {
+diff --git a/public/quote.html b/public/quote.html
+index 14f9b68..f77f9f1 100644
+--- a/public/quote.html
++++ b/public/quote.html
+@@ -154,6 +154,7 @@
+     </div>
+   </footer>
+ 
++  <script src="config.js"></script>
+   <script src="app.js"></script>
+   <script src="quote.js"></script>
+ </body>
+diff --git a/public/quote.js b/public/quote.js
+index 4dbc6a6..50dd131 100644
+--- a/public/quote.js
++++ b/public/quote.js
+@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
+ 
+ function testAPIConnectivity() {
+   console.log('Testing API connectivity...');
+-  fetch('/api/products')
++  fetch(apiUrl('/api/products'))
+     .then(r => {
+       console.log('API response status:', r.status);
+       return r.json();
+@@ -145,7 +145,7 @@ async function submitQuoteWithLogging(quoteData) {
+     console.log('Content-Type: application/json');
+     console.log('Payload:', JSON.stringify(quoteData, null, 2));
+ 
+-    const response = await fetch(`/api/quotes`, {
++    const response = await fetch(apiUrl(`/api/quotes`), {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json'
+@@ -204,7 +204,7 @@ window.diagnoseQuoteForm = function() {
+   console.log('');
+ 
+   console.log('%c3. API Connectivity Test', 'font-size: 12px; font-weight: bold;');
+-  fetch('/api/products')
++  fetch(apiUrl('/api/products'))
+     .then(r => r.json())
+     .then(d => {
+       console.log('✅ API WORKING - Products loaded:', d.length);
+diff --git a/render.yaml b/render.yaml
+index 8b0e30f..cd99280 100644
+--- a/render.yaml
++++ b/render.yaml
+@@ -1,4 +1,8 @@
+ services:
++  # ---------------------------------------------------------------------------
++  # API + admin. Serves /api/*, uploaded files, admin.html and
++  # order-tracking.html. The admin session cookie stays same-origin here.
++  # ---------------------------------------------------------------------------
+   - type: web
+     name: sovereign-prints
+     env: node
+@@ -14,3 +18,34 @@ services:
+         generateValue: true
+       - key: DATABASE_URL
+         sync: false
++      # Comma-separated list of origins allowed to call the API cross-origin.
++      # Set this to the static site's URL once it has been created, e.g.
++      # https://sovereign-prints-web.onrender.com,https://www.sovereignprints.co.za
++      - key: STATIC_SITE_ORIGINS
++        sync: false
++
++  # ---------------------------------------------------------------------------
++  # Customer-facing static site. Plain HTML/CSS/JS, served from Render's CDN.
++  # It talks to the web service above over the public API.
++  # ---------------------------------------------------------------------------
++  - type: web
++    runtime: static
++    name: sovereign-prints-site
++    buildCommand: ./build-static.sh
++    staticPublishPath: ./dist
++    envVars:
++      # The web service's URL. Overrides the default baked into config.js at
++      # build time, e.g. https://cathrine.onrender.com
++      - key: API_HOST
++        sync: false
++    routes:
++      - type: rewrite
++        source: /*
++        destination: /404.html
++    headers:
++      - path: /*
++        name: X-Content-Type-Options
++        value: nosniff
++      - path: /*
++        name: Referrer-Policy
++        value: strict-origin-when-cross-origin
+diff --git a/server.js b/server.js
+index c1838e5..61c9c91 100644
+--- a/server.js
++++ b/server.js
+@@ -23,7 +23,28 @@ const SESSION_SECRET = JWT_SECRET || 'insecure-dev-secret-do-not-use-in-producti
+ const SESSION_COOKIE = 'admin_session';
+ 
+ // Middleware
+-app.use(cors());
++//
++// The customer-facing site is deployed separately as a Render Static Site, so
++// it calls this API cross-origin. Allowed origins are configured via the
++// STATIC_SITE_ORIGINS environment variable (comma separated). Requests without
++// an Origin header (server-to-server, curl, same-origin navigations) are
++// always allowed. Credentials are NOT enabled: the admin pages are served by
++// this same service, so the admin session cookie is always same-origin.
++const allowedOrigins = (process.env.STATIC_SITE_ORIGINS || '')
++  .split(',')
++  .map(o => o.trim().replace(/\/$/, ''))
++  .filter(Boolean);
++
++app.use(cors({
++  origin(origin, callback) {
++    if (!origin) return callback(null, true);
++    if (allowedOrigins.length === 0) return callback(null, true);
++    const normalized = origin.replace(/\/$/, '');
++    if (allowedOrigins.includes(normalized)) return callback(null, true);
++    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return callback(null, true);
++    return callback(new Error('Not allowed by CORS: ' + origin));
++  }
++}));
+ app.use(bodyParser.json());
+ app.use(bodyParser.urlencoded({ extended: true }));
+ app.use(cookieParser());
+-- 
+2.43.0
+
+
+From ef54eeea2f0eaa81be034bfed0b89fc37a2972c7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 13:34:40 +0000
+Subject: [PATCH 2/2] Add website publishing controls to the admin panel
+
+Content edits (products, prices, gallery, business details) are served from
+the API and are already live instantly. A static rebuild is only needed when
+the page files themselves change, so this adds an explicit way to trigger one.
+
+- publish.js: calls the static site's Render Deploy Hook, with debouncing so a
+  burst of admin edits collapses into a single build
+- GET/POST /api/admin/publish for status and manual publishing
+- new "Website" tab in the admin panel with plain-language status and an
+  "Update website now" button
+- optional AUTO_PUBLISH=true rebuilds automatically after content changes
+- render.yaml: autoDeploy on both services, plus the new env vars
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XHRkqpijyrVnGpHMk66YGP
+---
+ public/admin.html |  80 +++++++++++++++++++++++++++++++++++
+ publish.js        | 103 ++++++++++++++++++++++++++++++++++++++++++++++
+ render.yaml       |  10 +++++
+ server.js         |  26 ++++++++++++
+ 4 files changed, 219 insertions(+)
+ create mode 100644 publish.js
+
+diff --git a/public/admin.html b/public/admin.html
+index d7dca65..4b58498 100644
+--- a/public/admin.html
++++ b/public/admin.html
+@@ -743,6 +743,7 @@
+         <a href="#" data-tab="pricing" class="sidebar-link">💰 Pricing</a>
+         <a href="#" data-tab="gallery" class="sidebar-link">🖼️ Gallery</a>
+         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
++        <a href="#" data-tab="website" class="sidebar-link">🚀 Website</a>
+         <a href="order-tracking.html" class="sidebar-link">💼 Quotes & Orders</a>
+         <a href="index.html" class="sidebar-link">🏠 View Site</a>
+         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
+@@ -918,6 +919,27 @@
+       </div>
+ 
+       <!-- SETTINGS TAB -->
++      <div id="website" class="tab-content">
++        <div class="section">
++          <h2>Website</h2>
++          <p style="color:#555; max-width:60ch;">
++            Everything you change here &mdash; products, prices, gallery images and business
++            details &mdash; appears on the website straight away. You do not need to do
++            anything else.
++          </p>
++          <p style="color:#555; max-width:60ch;">
++            The button below is only needed if the website&rsquo;s <em>design or layout</em>
++            has been changed by a developer. It rebuilds the public site, which takes a few
++            minutes.
++          </p>
++          <div id="publishStatus" style="margin:1rem 0; padding:0.85rem 1rem; border-radius:8px; background:#f4f4f5;">
++            Checking&hellip;
++          </div>
++          <button type="button" class="btn" id="publishBtn" onclick="publishWebsite()">Update website now</button>
++          <div id="publishMessage" style="margin-top:0.75rem;"></div>
++        </div>
++      </div>
++
+       <div id="settings" class="tab-content">
+         <div class="section">
+           <h2>Business Details</h2>
+@@ -1304,6 +1326,64 @@
+       const tab = document.getElementById(tabName);
+       if (tab) tab.classList.add('active');
+       if (tabName === 'settings') loadBusinessSettings();
++      if (tabName === 'website') loadPublishStatus();
++    }
++
++    // WEBSITE PUBLISHING
++    function describePublishStatus(st) {
++      if (!st.configured) {
++        return '<strong>Not set up.</strong> Rebuilding the website from here has not been ' +
++               'configured yet. Your content changes still go live immediately.';
++      }
++      var lines = [];
++      if (st.publishPending) {
++        lines.push('<strong>A website update is queued.</strong> It will start shortly.');
++      }
++      if (st.lastTriggeredAt) {
++        var when = new Date(st.lastTriggeredAt).toLocaleString();
++        lines.push(st.lastStatus === 'success'
++          ? 'Last update started ' + when + '.'
++          : 'Last attempt (' + when + ') did not work: ' + (st.lastMessage || 'unknown error'));
++      } else {
++        lines.push('No website update has been run yet.');
++      }
++      lines.push(st.autoPublish
++        ? 'Automatic updates are <strong>on</strong>.'
++        : 'Automatic updates are off &mdash; content changes go live without one.');
++      return lines.join('<br>');
++    }
++
++    async function loadPublishStatus() {
++      var box = document.getElementById('publishStatus');
++      if (!box) return;
++      try {
++        const res = await fetch('/api/admin/publish');
++        if (!res.ok) throw new Error('Could not read status');
++        box.innerHTML = describePublishStatus(await res.json());
++      } catch (error) {
++        box.innerHTML = 'Could not check the website status right now.';
++      }
++    }
++
++    async function publishWebsite() {
++      var btn = document.getElementById('publishBtn');
++      var msg = document.getElementById('publishMessage');
++      btn.disabled = true;
++      var original = btn.textContent;
++      btn.textContent = 'Starting\u2026';
++      msg.innerHTML = '';
++      try {
++        const res = await fetch('/api/admin/publish', { method: 'POST' });
++        const data = await res.json();
++        if (!res.ok) throw new Error(data.error || 'Update failed');
++        msg.innerHTML = '<span style="color:#22c55e;">Website update started. It should be live in a few minutes.</span>';
++      } catch (error) {
++        msg.innerHTML = '<span style="color:#ef4444;">' + error.message + '</span>';
++      } finally {
++        btn.disabled = false;
++        btn.textContent = original;
++        loadPublishStatus();
++      }
+     }
+ 
+     // DATA LOADING
+diff --git a/publish.js b/publish.js
+new file mode 100644
+index 0000000..4c1b65c
+--- /dev/null
++++ b/publish.js
+@@ -0,0 +1,103 @@
++/*
++ * Static site publishing.
++ *
++ * The customer-facing pages are a Render Static Site built from this repo.
++ * Product, gallery and settings content is fetched from this API at runtime,
++ * so content edits made in the admin panel are live immediately and do NOT
++ * require a rebuild. A rebuild is only needed when the page files themselves
++ * change (layout, styling, new pages).
++ *
++ * This module triggers that rebuild by calling the static service's Render
++ * Deploy Hook. Calls are debounced so that a burst of admin edits results in a
++ * single build rather than one per save.
++ */
++
++const DEPLOY_HOOK_URL = process.env.RENDER_DEPLOY_HOOK_URL || '';
++// Wait this long after the last change before building, so a run of edits
++// collapses into one deploy. Override with PUBLISH_DEBOUNCE_MS.
++const DEBOUNCE_MS = parseInt(process.env.PUBLISH_DEBOUNCE_MS || '120000', 10);
++// Automatic publishing after content changes. Off unless explicitly enabled,
++// because content is already live without a rebuild.
++const AUTO_PUBLISH = process.env.AUTO_PUBLISH === 'true';
++
++let pendingTimer = null;
++let pendingReason = null;
++let inFlight = false;
++
++const state = {
++  configured: Boolean(DEPLOY_HOOK_URL),
++  autoPublish: AUTO_PUBLISH,
++  lastStatus: null,      // 'success' | 'failed' | null
++  lastMessage: null,
++  lastTriggeredAt: null,
++  lastReason: null,
++  scheduledFor: null
++};
++
++async function callDeployHook(reason) {
++  if (!DEPLOY_HOOK_URL) {
++    state.lastStatus = 'failed';
++    state.lastMessage = 'No deploy hook configured. Set RENDER_DEPLOY_HOOK_URL.';
++    return { ok: false, error: state.lastMessage };
++  }
++  if (inFlight) {
++    return { ok: true, skipped: true, error: null };
++  }
++
++  inFlight = true;
++  try {
++    const res = await fetch(DEPLOY_HOOK_URL, { method: 'POST' });
++    const body = await res.text();
++    state.lastTriggeredAt = new Date().toISOString();
++    state.lastReason = reason || 'manual';
++    if (res.ok) {
++      state.lastStatus = 'success';
++      state.lastMessage = 'Website update started. It is usually live within a few minutes.';
++      return { ok: true, error: null };
++    }
++    state.lastStatus = 'failed';
++    state.lastMessage = `Render rejected the request (${res.status}). ${body.slice(0, 200)}`;
++    return { ok: false, error: state.lastMessage };
++  } catch (err) {
++    state.lastStatus = 'failed';
++    state.lastTriggeredAt = new Date().toISOString();
++    state.lastMessage = `Could not reach Render: ${err.message}`;
++    return { ok: false, error: state.lastMessage };
++  } finally {
++    inFlight = false;
++  }
++}
++
++// Publish right now, bypassing the debounce (the admin "Update website" button).
++async function publishNow(reason) {
++  if (pendingTimer) {
++    clearTimeout(pendingTimer);
++    pendingTimer = null;
++    state.scheduledFor = null;
++  }
++  return callDeployHook(reason || 'manual');
++}
++
++// Queue a publish after a content change. No-op unless AUTO_PUBLISH is on.
++function schedulePublish(reason) {
++  if (!AUTO_PUBLISH || !DEPLOY_HOOK_URL) return;
++
++  pendingReason = reason || 'content change';
++  if (pendingTimer) clearTimeout(pendingTimer);
++  state.scheduledFor = new Date(Date.now() + DEBOUNCE_MS).toISOString();
++
++  pendingTimer = setTimeout(() => {
++    pendingTimer = null;
++    state.scheduledFor = null;
++    callDeployHook(pendingReason).catch(() => { /* state already recorded */ });
++  }, DEBOUNCE_MS);
++
++  // Don't hold the process open just for a pending deploy.
++  if (pendingTimer.unref) pendingTimer.unref();
++}
++
++function getStatus() {
++  return { ...state, publishPending: Boolean(pendingTimer) };
++}
++
++module.exports = { publishNow, schedulePublish, getStatus };
+diff --git a/render.yaml b/render.yaml
+index cd99280..9bdddf3 100644
+--- a/render.yaml
++++ b/render.yaml
+@@ -9,6 +9,7 @@ services:
+     plan: free
+     buildCommand: npm install
+     startCommand: npm start
++    autoDeploy: true
+     envVars:
+       - key: NODE_ENV
+         value: production
+@@ -23,6 +24,14 @@ services:
+       # https://sovereign-prints-web.onrender.com,https://www.sovereignprints.co.za
+       - key: STATIC_SITE_ORIGINS
+         sync: false
++      # Deploy hook URL of the static service (Render > static site > Settings >
++      # Deploy Hook). Enables the "Update website" button in the admin panel.
++      - key: RENDER_DEPLOY_HOOK_URL
++        sync: false
++      # Set to "true" to also rebuild automatically after admin content changes.
++      # Not required: content is served from this API and is live immediately.
++      - key: AUTO_PUBLISH
++        value: "false"
+ 
+   # ---------------------------------------------------------------------------
+   # Customer-facing static site. Plain HTML/CSS/JS, served from Render's CDN.
+@@ -33,6 +42,7 @@ services:
+     name: sovereign-prints-site
+     buildCommand: ./build-static.sh
+     staticPublishPath: ./dist
++    autoDeploy: true
+     envVars:
+       # The web service's URL. Overrides the default baked into config.js at
+       # build time, e.g. https://cathrine.onrender.com
+diff --git a/server.js b/server.js
+index 61c9c91..f9b4bee 100644
+--- a/server.js
++++ b/server.js
+@@ -2,6 +2,7 @@ const express = require('express');
+ const cors = require('cors');
+ const bodyParser = require('body-parser');
+ const cookieParser = require('cookie-parser');
++const publisher = require('./publish');
+ const multer = require('multer');
+ const jwt = require('jsonwebtoken');
+ const crypto = require('crypto');
+@@ -526,6 +527,7 @@ app.get('/api/admin/products', adminAuth, async (req, res) => {
+ 
+ // Accepts any number of images at once; they all become pictures of the product.
+ app.post('/api/admin/products', adminAuth, upload.array('images', 12), async (req, res) => {
++  publisher.schedulePublish('product added');
+   try {
+     const { name, category, basePrice, description, specifications, turnaroundDays, pricingNote } = req.body;
+     const files = req.files || [];
+@@ -567,6 +569,7 @@ app.post('/api/admin/products', adminAuth, upload.array('images', 12), async (re
+ });
+ 
+ app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
++  publisher.schedulePublish('product updated');
+   try {
+     const id = parseInt(req.params.id);
+     const { rows: existingRows } = await db.query('SELECT * FROM products WHERE id = $1', [id]);
+@@ -604,6 +607,7 @@ app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
+ // Replaces the whole size list for a product in one go — the Pricing tab edits
+ // all the rows together, so a single write keeps them consistent.
+ app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
++  publisher.schedulePublish('product pricing changed');
+   try {
+     const id = parseInt(req.params.id);
+     const { rows } = await db.query('SELECT id FROM products WHERE id = $1', [id]);
+@@ -638,6 +642,7 @@ app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
+ 
+ // Adds pictures to a product. Existing pictures are always kept.
+ app.post('/api/admin/products/:id/images', adminAuth, upload.array('images', 12), async (req, res) => {
++  publisher.schedulePublish('product images changed');
+   try {
+     const id = parseInt(req.params.id);
+     const { rows } = await db.query('SELECT id, image FROM products WHERE id = $1', [id]);
+@@ -676,6 +681,7 @@ app.post('/api/admin/products/:id/images', adminAuth, upload.array('images', 12)
+ });
+ 
+ app.delete('/api/admin/products/:id/images/:imageId', adminAuth, async (req, res) => {
++  publisher.schedulePublish('product images changed');
+   try {
+     const productId = parseInt(req.params.id);
+     const { rows } = await db.query(
+@@ -699,6 +705,7 @@ app.delete('/api/admin/products/:id/images/:imageId', adminAuth, async (req, res
+ });
+ 
+ app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
++  publisher.schedulePublish('product removed');
+   try {
+     const { rows } = await db.query(
+       'UPDATE products SET active = false WHERE id = $1 RETURNING id',
+@@ -739,6 +746,7 @@ app.get('/api/admin/gallery', adminAuth, async (req, res) => {
+ // Takes one or many images at once and adds each as its own gallery entry.
+ // Existing gallery items are never touched.
+ app.post('/api/admin/gallery', adminAuth, upload.array('images', 20), async (req, res) => {
++  publisher.schedulePublish('gallery updated');
+   try {
+     const files = req.files || [];
+     if (!files.length) {
+@@ -772,6 +780,7 @@ app.post('/api/admin/gallery', adminAuth, upload.array('images', 20), async (req
+ });
+ 
+ app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), async (req, res) => {
++  publisher.schedulePublish('gallery updated');
+   try {
+     const { title, category, description, active } = req.body;
+     const id = parseInt(req.params.id);
+@@ -806,6 +815,7 @@ app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), async (re
+ });
+ 
+ app.delete('/api/admin/gallery/:id', adminAuth, async (req, res) => {
++  publisher.schedulePublish('gallery updated');
+   try {
+     const { rows } = await db.query('DELETE FROM gallery WHERE id = $1 RETURNING id', [parseInt(req.params.id)]);
+     if (!rows.length) {
+@@ -978,6 +988,7 @@ app.get('/api/settings', async (req, res) => {
+ });
+ 
+ app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
++  publisher.schedulePublish('business details changed');
+   try {
+     const settings = await db.saveSettings(req.body || {});
+     res.json({ success: true, settings, message: 'Settings saved' });
+@@ -1167,6 +1178,21 @@ app.delete('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
+ 
+ // Upload problems (wrong file type, over the size limit) should read as a clear
+ // 400 rather than a generic server error.
++// ============ WEBSITE PUBLISHING ============
++// Content edits (products, gallery, prices, settings) are live immediately --
++// the customer site reads them from this API. These endpoints rebuild the
++// static site, which is only needed when the page files themselves change.
++
++app.get('/api/admin/publish', adminAuth, (req, res) => {
++  res.json(publisher.getStatus());
++});
++
++app.post('/api/admin/publish', adminAuth, async (req, res) => {
++  const result = await publisher.publishNow('manual');
++  if (!result.ok) return res.status(502).json({ error: result.error, status: publisher.getStatus() });
++  res.json({ success: true, status: publisher.getStatus() });
++});
++
+ app.use((err, req, res, next) => {
+   if (err instanceof multer.MulterError || err.message === 'Invalid file type') {
+     return res.status(400).json({
+-- 
+2.43.0
+

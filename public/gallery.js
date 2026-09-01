@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadGalleryItems() {
   try {
     // Fetch gallery items from server API endpoint
-    const response = await fetch('/api/gallery');
+    const response = await fetch(apiUrl('/api/gallery'));
     if (!response.ok) throw new Error('Failed to load gallery');
     allGalleryItems = await response.json();
     // Filter to only active items
@@ -83,7 +83,7 @@ function displayGalleryItems() {
   galleryGrid.innerHTML = filteredItems.map(item => `
     <div class="gallery-item" data-gallery-id="${item.id}">
       <div class="gallery-image">
-        <img src="${item.image || item.imageUrl}" alt="${item.title}" style="width:100%; height:100%; object-fit:cover; display:block;">
+        <img src="${mediaUrl(item.image || item.imageUrl)}" alt="${item.title}" style="width:100%; height:100%; object-fit:cover; display:block;">
       </div>
       <div class="gallery-info">
         <div class="gallery-category">${item.category}</div>
@@ -151,7 +151,7 @@ function showLightbox(galleryId) {
   const lightboxDescription = document.getElementById('lightboxDescription');
 
   // Set image and info
-  lightboxImage.src = item.image;
+  lightboxImage.src = mediaUrl(item.image);
   lightboxImage.alt = item.title;
   lightboxTitle.textContent = item.title;
   lightboxDescription.textContent = item.description || 'Custom branding and printing services by Sovereign Prints';

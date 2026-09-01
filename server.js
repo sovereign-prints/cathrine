@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const publisher = require('./publish');
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -23,7 +24,28 @@ const SESSION_SECRET = JWT_SECRET || 'insecure-dev-secret-do-not-use-in-producti
 const SESSION_COOKIE = 'admin_session';
 
 // Middleware
-app.use(cors());
+//
+// The customer-facing site is deployed separately as a Render Static Site, so
+// it calls this API cross-origin. Allowed origins are configured via the
+// STATIC_SITE_ORIGINS environment variable (comma separated). Requests without
+// an Origin header (server-to-server, curl, same-origin navigations) are
+// always allowed. Credentials are NOT enabled: the admin pages are served by
+// this same service, so the admin session cookie is always same-origin.
+const allowedOrigins = (process.env.STATIC_SITE_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(null, true);
+    const normalized = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalized)) return callback(null, true);
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS: ' + origin));
+  }
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -128,7 +150,7 @@ function mapQuote(row) {
 
 // Line items arrive from the quote builder as {name, qty, price}. Recomputing the
 // money here keeps the stored totals honest regardless of what the client sent.
-const TAX_RATE = 0.15;
+// Sovereign Prints does not charge tax, so a total is simply the line items.
 
 function normaliseLineItems(items) {
   return (Array.isArray(items) ? items : [])
@@ -142,8 +164,7 @@ function normaliseLineItems(items) {
 
 function priceLineItems(items) {
   const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
-  const tax = subtotal * TAX_RATE;
-  return { subtotal, tax, total: subtotal + tax };
+  return { subtotal, tax: 0, total: subtotal };
 }
 
 function mapGallery(row) {
@@ -188,6 +209,10 @@ function mapProject(row) {
     status: row.status,
     notes: row.notes || '',
     quoteId: row.quote_id === null || row.quote_id === undefined ? null : Number(row.quote_id),
+    lineItems: Array.isArray(row.line_items) ? row.line_items : [],
+    subtotal: Number(row.subtotal || 0),
+    tax: Number(row.tax || 0),
+    total: Number(row.total || 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -502,6 +527,7 @@ app.get('/api/admin/products', adminAuth, async (req, res) => {
 
 // Accepts any number of images at once; they all become pictures of the product.
 app.post('/api/admin/products', adminAuth, upload.array('images', 12), async (req, res) => {
+  publisher.schedulePublish('product added');
   try {
     const { name, category, basePrice, description, specifications, turnaroundDays, pricingNote } = req.body;
     const files = req.files || [];
@@ -543,6 +569,7 @@ app.post('/api/admin/products', adminAuth, upload.array('images', 12), async (re
 });
 
 app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
+  publisher.schedulePublish('product updated');
   try {
     const id = parseInt(req.params.id);
     const { rows: existingRows } = await db.query('SELECT * FROM products WHERE id = $1', [id]);
@@ -580,6 +607,7 @@ app.patch('/api/admin/products/:id', adminAuth, async (req, res) => {
 // Replaces the whole size list for a product in one go — the Pricing tab edits
 // all the rows together, so a single write keeps them consistent.
 app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
+  publisher.schedulePublish('product pricing changed');
   try {
     const id = parseInt(req.params.id);
     const { rows } = await db.query('SELECT id FROM products WHERE id = $1', [id]);
@@ -614,6 +642,7 @@ app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
 
 // Adds pictures to a product. Existing pictures are always kept.
 app.post('/api/admin/products/:id/images', adminAuth, upload.array('images', 12), async (req, res) => {
+  publisher.schedulePublish('product images changed');
   try {
     const id = parseInt(req.params.id);
     const { rows } = await db.query('SELECT id, image FROM products WHERE id = $1', [id]);
@@ -652,6 +681,7 @@ app.post('/api/admin/products/:id/images', adminAuth, upload.array('images', 12)
 });
 
 app.delete('/api/admin/products/:id/images/:imageId', adminAuth, async (req, res) => {
+  publisher.schedulePublish('product images changed');
   try {
     const productId = parseInt(req.params.id);
     const { rows } = await db.query(
@@ -675,6 +705,7 @@ app.delete('/api/admin/products/:id/images/:imageId', adminAuth, async (req, res
 });
 
 app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
+  publisher.schedulePublish('product removed');
   try {
     const { rows } = await db.query(
       'UPDATE products SET active = false WHERE id = $1 RETURNING id',
@@ -715,6 +746,7 @@ app.get('/api/admin/gallery', adminAuth, async (req, res) => {
 // Takes one or many images at once and adds each as its own gallery entry.
 // Existing gallery items are never touched.
 app.post('/api/admin/gallery', adminAuth, upload.array('images', 20), async (req, res) => {
+  publisher.schedulePublish('gallery updated');
   try {
     const files = req.files || [];
     if (!files.length) {
@@ -748,6 +780,7 @@ app.post('/api/admin/gallery', adminAuth, upload.array('images', 20), async (req
 });
 
 app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), async (req, res) => {
+  publisher.schedulePublish('gallery updated');
   try {
     const { title, category, description, active } = req.body;
     const id = parseInt(req.params.id);
@@ -782,6 +815,7 @@ app.patch('/api/admin/gallery/:id', adminAuth, upload.single('image'), async (re
 });
 
 app.delete('/api/admin/gallery/:id', adminAuth, async (req, res) => {
+  publisher.schedulePublish('gallery updated');
   try {
     const { rows } = await db.query('DELETE FROM gallery WHERE id = $1 RETURNING id', [parseInt(req.params.id)]);
     if (!rows.length) {
@@ -942,6 +976,27 @@ app.post('/api/admin/templates/:id/generate', adminAuth, async (req, res) => {
 
 // ============ PROJECT TRACKING ROUTES ============
 
+// ============ BUSINESS SETTINGS ============
+// Public read: the customer site and the documents both need the contact and
+// banking details. Nothing secret is stored here.
+app.get('/api/settings', async (req, res) => {
+  try {
+    res.json({ settings: await db.getSettings() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
+  publisher.schedulePublish('business details changed');
+  try {
+    const settings = await db.saveSettings(req.body || {});
+    res.json({ success: true, settings, message: 'Settings saved' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
 app.get('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
     const { rows } = await db.query('SELECT * FROM projects ORDER BY created_at DESC');
@@ -986,7 +1041,8 @@ app.get('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
 app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
   try {
-    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId } = req.body;
+    const { projectName, customerName, customerEmail, customerPhone, serviceType, description, quotedPrice, dueDate, status, notes, quoteId, lineItems } = req.body;
+    const projectTotals = priceLineItems(normaliseLineItems(lineItems));
 
     if (!projectName || !customerName || !dueDate || !status) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -994,8 +1050,8 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
 
     const id = Date.now();
     const { rows } = await db.query(
-      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes, quote_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      `INSERT INTO projects (id, project_name, customer_name, customer_email, customer_phone, service_type, description, quoted_price, due_date, status, notes, quote_id, line_items, subtotal, tax, total)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [
         id,
         projectName.trim(),
@@ -1008,7 +1064,11 @@ app.post('/api/admin/projects', authenticateAdmin, async (req, res) => {
         dueDate,
         status.toLowerCase(),
         notes?.trim() || '',
-        quoteId ? parseInt(quoteId) : null
+        quoteId ? parseInt(quoteId) : null,
+        JSON.stringify(normaliseLineItems(lineItems)),
+        projectTotals.subtotal,
+        0,
+        projectTotals.total
       ]
     );
 
@@ -1055,13 +1115,23 @@ app.patch('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
       }
     });
 
+    const patchedItems = normaliseLineItems(
+      updates.hasOwnProperty('lineItems') ? updates.lineItems : (existing.line_items || [])
+    );
+    const patchedTotals = priceLineItems(patchedItems);
+
     const { rows } = await db.query(
       `UPDATE projects SET project_name = $1, customer_name = $2, customer_email = $3, customer_phone = $4,
-       service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10, updated_at = now()
-       WHERE id = $11 RETURNING *`,
+       service_type = $5, description = $6, quoted_price = $7, due_date = $8, status = $9, notes = $10,
+       line_items = $11, subtotal = $12, tax = $13, total = $14, updated_at = now()
+       WHERE id = $15 RETURNING *`,
       [
         merged.project_name, merged.customer_name, merged.customer_email, merged.customer_phone,
         merged.service_type, merged.description, merged.quoted_price, merged.due_date, merged.status, merged.notes,
+        JSON.stringify(patchedItems),
+        patchedTotals.subtotal,
+        0,
+        patchedTotals.total,
         projectId
       ]
     );
@@ -1108,6 +1178,21 @@ app.delete('/api/admin/projects/:id', authenticateAdmin, async (req, res) => {
 
 // Upload problems (wrong file type, over the size limit) should read as a clear
 // 400 rather than a generic server error.
+// ============ WEBSITE PUBLISHING ============
+// Content edits (products, gallery, prices, settings) are live immediately --
+// the customer site reads them from this API. These endpoints rebuild the
+// static site, which is only needed when the page files themselves change.
+
+app.get('/api/admin/publish', adminAuth, (req, res) => {
+  res.json(publisher.getStatus());
+});
+
+app.post('/api/admin/publish', adminAuth, async (req, res) => {
+  const result = await publisher.publishNow('manual');
+  if (!result.ok) return res.status(502).json({ error: result.error, status: publisher.getStatus() });
+  res.json({ success: true, status: publisher.getStatus() });
+});
+
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || err.message === 'Invalid file type') {
     return res.status(400).json({

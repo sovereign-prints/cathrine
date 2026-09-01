@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function testAPIConnectivity() {
   console.log('Testing API connectivity...');
-  fetch('/api/products')
+  fetch(apiUrl('/api/products'))
     .then(r => {
       console.log('API response status:', r.status);
       return r.json();
@@ -145,7 +145,7 @@ async function submitQuoteWithLogging(quoteData) {
     console.log('Content-Type: application/json');
     console.log('Payload:', JSON.stringify(quoteData, null, 2));
 
-    const response = await fetch(`/api/quotes`, {
+    const response = await fetch(apiUrl(`/api/quotes`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -204,7 +204,7 @@ window.diagnoseQuoteForm = function() {
   console.log('');
 
   console.log('%c3. API Connectivity Test', 'font-size: 12px; font-weight: bold;');
-  fetch('/api/products')
+  fetch(apiUrl('/api/products'))
     .then(r => r.json())
     .then(d => {
       console.log('✅ API WORKING - Products loaded:', d.length);

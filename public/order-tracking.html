@@ -284,6 +284,29 @@
             flex-wrap: wrap;
         }
 
+        /* The collapsed order heading is the tap target, so give it a
+           comfortable height and make it obviously interactive. */
+        .order-summary {
+            cursor: pointer;
+            min-height: 48px;
+            align-items: center;
+            margin-bottom: 0;
+            padding: 4px 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .order-summary:active { opacity: 0.65; }
+        .chevron {
+            font-size: 12px;
+            color: var(--text-light);
+            flex: 0 0 auto;
+        }
+        .order-details { margin-top: 12px; }
+        .badge-overdue {
+            background: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            margin-left: 6px;
+        }
+
         .card-title {
             font-size: 16px;
             font-weight: 600;
@@ -720,8 +743,12 @@
                         <label class="required" for="quoteService">Service Type</label>
                         <select id="quoteService" required>
                             <option value="">Select service</option>
-                            <option>Printing</option>
                             <option>Clothing</option>
+                            <option>Printing</option>
+                            <option>Printing &amp; Clothing</option>
+                            <option>Vinyl Cut Out</option>
+                            <option>Stickers</option>
+                            <option>Printable Iron-On Sheet</option>
                             <option>Signage</option>
                             <option>Vehicle Branding</option>
                             <option>Custom</option>
@@ -743,10 +770,6 @@
                     <div class="totals-row">
                         <div>Subtotal</div>
                         <div id="subtotal">R 0.00</div>
-                    </div>
-                    <div class="totals-row">
-                        <div>Tax (15%)</div>
-                        <div id="tax">R 0.00</div>
                     </div>
                     <div class="totals-row total">
                         <div>TOTAL</div>
@@ -849,8 +872,12 @@
                         <label class="required" for="moService">Service Type</label>
                         <select id="moService" required>
                             <option value="">Select service</option>
-                            <option>Printing</option>
                             <option>Clothing</option>
+                            <option>Printing</option>
+                            <option>Printing &amp; Clothing</option>
+                            <option>Vinyl Cut Out</option>
+                            <option>Stickers</option>
+                            <option>Printable Iron-On Sheet</option>
                             <option>Signage</option>
                             <option>Vehicle Branding</option>
                             <option>Custom</option>
@@ -872,10 +899,6 @@
                     <div class="totals-row">
                         <div>Subtotal</div>
                         <div id="moSubtotal">R 0.00</div>
-                    </div>
-                    <div class="totals-row">
-                        <div>Tax (15%)</div>
-                        <div id="moTax">R 0.00</div>
                     </div>
                     <div class="totals-row total">
                         <div>TOTAL</div>
@@ -966,9 +989,29 @@
 </div>
 
 <script>
-const TAX_RATE = 0.15;
+// Tracks whether the quote form has unsaved edits.
+let quoteDirty = false;
+function markQuoteDirty() { quoteDirty = true; }
 
-let quotes = [];
+// Sovereign Prints does not charge tax. Totals are the sum of the line items,
+// nothing more.
+let businessSettings = {
+    businessName: 'Sovereign Prints', bankName: 'FNB',
+    bankAccountNumber: '', bankAccountHolder: ''
+};
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+            const data = await res.json();
+            businessSettings = { ...businessSettings, ...data.settings };
+        }
+    } catch (e) { /* keep the safe defaults */ }
+    calculateQuoteTotal();
+}
+
+let quotes = [];      // quotes still awaiting conversion (shown in the list)
+let allQuotes = [];   // every quote, including converted ones, for reprinting
 let orders = [];
 let editingQuoteId = null;   // quote currently loaded into the builder
 let modalQuote = null;       // quote being reviewed in the create-order modal (null = blank order)
@@ -1068,10 +1111,13 @@ async function loadQuotes() {
         const res = await fetch('/api/admin/quotes');
         if (!res.ok) throw new Error('Failed to load quotes');
         const all = await res.json();
-        // A quote stays available until it is explicitly converted or dismissed.
+        // Every quote is kept in memory — a converted quote must still be
+        // printable from the order it produced. The list below just hides them.
+        allQuotes = all;
         quotes = all.filter(q => !['converted', 'dismissed', 'cancelled'].includes(q.status));
     } catch (e) {
         console.error('Error loading quotes:', e);
+        allQuotes = [];
         quotes = [];
     }
     displayQuotes();
@@ -1165,11 +1211,9 @@ function recalcTotals(containerId, ids) {
         subtotal += rowTotal;
     });
 
-    const tax = subtotal * TAX_RATE;
     document.getElementById(ids.subtotal).textContent = money(subtotal);
-    document.getElementById(ids.tax).textContent = money(tax);
-    document.getElementById(ids.total).textContent = money(subtotal + tax);
-    return { subtotal, tax, total: subtotal + tax };
+    document.getElementById(ids.total).textContent = money(subtotal);
+    return { subtotal, tax: 0, total: subtotal };
 }
 
 // ---- builder ----
@@ -1180,7 +1224,7 @@ function addLineItem(item) {
 }
 
 function calculateQuoteTotal() {
-    return recalcTotals('lineItemsContainer', { subtotal: 'subtotal', tax: 'tax', total: 'quoteTotal' });
+    return recalcTotals('lineItemsContainer', { subtotal: 'subtotal', total: 'quoteTotal' });
 }
 
 // ---- modal ----
@@ -1191,7 +1235,7 @@ function addModalLineItem(item) {
 }
 
 function calculateModalTotal() {
-    return recalcTotals('moLineItems', { subtotal: 'moSubtotal', tax: 'moTax', total: 'moTotal' });
+    return recalcTotals('moLineItems', { subtotal: 'moSubtotal', total: 'moTotal' });
 }
 
 // ============ QUOTE BUILDER ============
@@ -1224,7 +1268,6 @@ function buildRequirements(items, totals, validUntil, notes) {
     return [
         ...items.map(it => `- ${it.name} x${it.qty} @ R${it.price.toFixed(2)}`),
         `Subtotal: ${money(totals.subtotal)}`,
-        `Tax (15%): ${money(totals.tax)}`,
         `Total: ${money(totals.total)}`,
         `Valid until: ${validUntil.toLocaleDateString()}`,
         notes ? `Notes: ${notes}` : null
@@ -1291,6 +1334,7 @@ function editQuote(id) {
 }
 
 function resetQuoteForm() {
+    quoteDirty = false;
     editingQuoteId = null;
     document.getElementById('quoteForm').reset();
     document.getElementById('lineItemsContainer').innerHTML = '';
@@ -1475,6 +1519,9 @@ async function confirmCreateOrder() {
                 serviceType: service,
                 description,
                 quotedPrice: money(totals.total),
+                lineItems: items,
+                subtotal: totals.subtotal,
+                total: totals.total,
                 dueDate: deadline,
                 status: document.getElementById('moStatus').value,
                 notes: document.getElementById('moOrderNotes').value,
@@ -1500,27 +1547,32 @@ async function confirmCreateOrder() {
     }
 }
 
-function displayOrders() {
-    const container = document.getElementById('ordersList');
-    if (!orders.length) {
-        container.innerHTML = '<div class="empty-state">No orders yet. Create one from the list above.</div>';
-        return;
-    }
+// Orders render collapsed — heading only. Details and the status control appear
+// when a card is tapped, so a long list stays scannable on a phone.
+const expandedOrders = new Set();
 
+function orderCardHtml(o) {
     const statusOptions = ['quoted', 'processing', 'complete', 'delivered', 'on-hold', 'cancelled'];
+    const isOverdue = o.dueDate && new Date(o.dueDate) < new Date()
+        && !['complete', 'delivered', 'cancelled'].includes(o.status);
+    const open = expandedOrders.has(o.id);
 
-    container.innerHTML = orders.map(o => {
-        const isOverdue = o.dueDate && new Date(o.dueDate) < new Date()
-            && !['complete', 'delivered', 'cancelled'].includes(o.status);
-        return `
-            <div class="card ${escapeHtml(o.status)}">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">${escapeHtml(o.projectName)}</div>
-                        <span class="badge badge-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
-                    </div>
-                    <div class="card-amount">${escapeHtml(o.quotedPrice || '-')}</div>
+    return `
+        <div class="card ${escapeHtml(o.status)}" data-order-id="${o.id}">
+            <div class="card-header order-summary" onclick="toggleOrder(${o.id})"
+                 role="button" tabindex="0" aria-expanded="${open}">
+                <div>
+                    <div class="card-title">${escapeHtml(o.projectName)}</div>
+                    <span class="badge badge-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
+                    ${isOverdue ? '<span class="badge badge-overdue">⚠️ OVERDUE</span>' : ''}
                 </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="card-amount">${escapeHtml(o.quotedPrice || '-')}</div>
+                    <span class="chevron">${open ? '▲' : '▼'}</span>
+                </div>
+            </div>
+
+            <div class="order-details" style="display:${open ? 'block' : 'none'};">
                 <div class="card-info">
                     <div>👤 ${escapeHtml(o.customerName)}</div>
                     <div>📅 Due: ${escapeHtml(o.dueDate || '-')} ${isOverdue ? '⚠️ OVERDUE' : ''}</div>
@@ -1529,18 +1581,56 @@ function displayOrders() {
                 <div class="form-group" style="margin-top:10px;">
                     <label>Progress Status</label>
                     <select onchange="changeOrderStatus(${o.id}, this.value)">
-                        ${statusOptions.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s.toUpperCase()}</option>`).join('')}
+                        ${statusOptions.map(st => `<option value="${st}" ${o.status === st ? 'selected' : ''}>${st.toUpperCase()}</option>`).join('')}
                     </select>
                     ${o.status !== 'complete' ? '<div style="font-size:12px;color:var(--text-light);margin-top:6px;">Set status to COMPLETE to generate an invoice.</div>' : ''}
                 </div>
                 <div class="card-actions">
                     <button class="action-btn" onclick="editOrder(${o.id})">✏️ Edit</button>
-                    ${o.status === 'complete' ? `<button class="action-btn" onclick="printInvoice(${o.id})">🖨️ Invoice</button>` : ''}
+                    <button class="action-btn" onclick="printOrderQuote(${o.id})">🖨️ Quote</button>
+                    ${['complete', 'delivered'].includes(o.status) ? `<button class="action-btn" onclick="printInvoice(${o.id})">🧾 Invoice</button>` : ''}
                     <button class="action-btn" onclick="deleteOrder(${o.id})">🗑️ Delete</button>
                 </div>
             </div>
-        `;
-    }).join('');
+        </div>
+    `;
+}
+
+function toggleOrder(id) {
+    if (expandedOrders.has(id)) expandedOrders.delete(id);
+    else expandedOrders.add(id);
+
+    const card = document.querySelector(`[data-order-id="${id}"]`);
+    if (!card) return;
+    const details = card.querySelector('.order-details');
+    const chevron = card.querySelector('.chevron');
+    const open = expandedOrders.has(id);
+    details.style.display = open ? 'block' : 'none';
+    chevron.textContent = open ? '▲' : '▼';
+    card.querySelector('.order-summary').setAttribute('aria-expanded', open);
+}
+
+function displayOrders() {
+    const container = document.getElementById('ordersList');
+    if (!orders.length) {
+        expandedOrders.clear();
+        container.innerHTML = '<div class="empty-state">No orders yet. Create one from the list above.</div>';
+        return;
+    }
+    // Forget any cards whose orders no longer exist.
+    const ids = new Set(orders.map(o => o.id));
+    [...expandedOrders].forEach(id => { if (!ids.has(id)) expandedOrders.delete(id); });
+
+    container.innerHTML = orders.map(orderCardHtml).join('');
+}
+
+// Redraws a single card in place. Nothing else on the page moves, so the view
+// stays exactly where the user left it.
+function refreshOrderCard(id) {
+    const order = orders.find(o => o.id === id);
+    const card = document.querySelector(`[data-order-id="${id}"]`);
+    if (!order || !card) { displayOrders(); return; }
+    card.outerHTML = orderCardHtml(order);
 }
 
 function editOrder(id) {
@@ -1601,10 +1691,20 @@ async function changeOrderStatus(id, status) {
             body: JSON.stringify({ status })
         });
         if (!res.ok) throw new Error('Server rejected the request');
+        const data = await res.json().catch(() => null);
+
+        // Update this one card in place rather than rebuilding the whole list,
+        // which used to throw the page back to the top.
+        const order = orders.find(o => o.id === id);
+        if (order) {
+            Object.assign(order, data && data.project ? data.project : { status });
+            expandedOrders.add(id);
+            refreshOrderCard(id);
+        }
         showMessage('✅ Status updated', 'success');
-        await loadOrders();
     } catch (e) {
         showMessage('❌ Could not update status: ' + e.message, 'error');
+        await loadOrders();
     }
 }
 
@@ -1674,7 +1774,11 @@ function printQuoteFromForm() {
         showMessage('Please enter a customer name before printing', 'error');
         return;
     }
-    // Printing is a preview only — it never saves anything on its own.
+    // Printing is a preview only — it never saves anything on its own, so say
+    // so plainly rather than letting the user assume the print saved the quote.
+    if (quoteDirty) {
+        showMessage('Printing a preview — this quote is not saved yet. Tap “Save Quote” when you are done.', 'info');
+    }
     renderQuotePdf({
         customerName: quote.customerName,
         customerEmail: quote.customerEmail,
@@ -1688,12 +1792,15 @@ function printQuoteFromForm() {
 }
 
 function printSavedQuote(id) {
-    const quote = quotes.find(q => q.id === id);
-    if (!quote) return;
+    const quote = allQuotes.find(q => q.id === id) || quotes.find(q => q.id === id);
+    if (!quote) {
+        showMessage('Could not find that quote.', 'error');
+        return;
+    }
 
     const items = quoteLineItems(quote);
     const subtotal = quote.subtotal || items.reduce((sum, it) => sum + it.qty * it.price, 0);
-    const tax = quote.tax || subtotal * TAX_RATE;
+
 
     renderQuotePdf({
         customerName: quote.customerName,
@@ -1702,7 +1809,7 @@ function printSavedQuote(id) {
         description: quote.description,
         notes: quote.notes,
         items,
-        totals: { subtotal, tax, total: quoteTotal(quote) || subtotal + tax },
+        totals: { subtotal, tax: 0, total: subtotal },
         validUntil: quote.validUntil ? new Date(quote.validUntil) : daysFromNow(7)
     });
 }
@@ -1718,17 +1825,6 @@ function pdfStyles() {
             padding: 48px;
             position: relative;
             overflow: hidden;
-        }
-        body::before {
-            content: '';
-            position: absolute;
-            top: -120px;
-            right: -120px;
-            width: 360px;
-            height: 360px;
-            background: radial-gradient(circle, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0) 70%);
-            border-radius: 50%;
-            z-index: 0;
         }
         .page { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; }
@@ -1796,20 +1892,58 @@ function pdfStyles() {
     `;
 }
 
+// Printing happens inside a hidden iframe rather than a new tab or window, so
+// this page — and anything typed into the quote form — is never navigated away
+// from. When the print dialog closes the user is still exactly where they were.
 function openPrintWindow(title, bodyHtml) {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        showMessage('⚠️ Your browser blocked the print window. Allow pop-ups for this site.', 'error');
-        return;
-    }
-    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 400);
+    const previous = document.getElementById('printFrame');
+    if (previous) previous.remove();
+
+    const frame = document.createElement('iframe');
+    frame.id = 'printFrame';
+    frame.setAttribute('aria-hidden', 'true');
+    // Positioned off-screen at a real size rather than 0x0 or visibility:hidden.
+    // Safari on iOS refuses to print a frame it considers invisible.
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:1100px;border:0;opacity:0;';
+    document.body.appendChild(frame);
+
+    const doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
+    doc.close();
+
+    let printed = false;
+    const doPrint = () => {
+        if (printed) return;
+        printed = true;
+        try {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+        } catch (e) {
+            // Some mobile browsers will not print from a frame at all. Fall back
+            // to a normal window so the document is never simply unavailable.
+            const win = window.open('', '_blank');
+            if (!win) {
+                showMessage('⚠️ Printing was blocked. Please allow pop-ups for this site and try again.', 'error');
+                return;
+            }
+            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>${pdfStyles()}</style></head><body>${bodyHtml}</body></html>`);
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 500);
+        }
+    };
+
+    // Print once the frame's own load event fires, with a timeout as a backstop
+    // in case the web font or logo never resolves.
+    frame.onload = doPrint;
+    setTimeout(doPrint, 1200);
 }
 
-function renderQuotePdf(data) {
-    const rowsHtml = data.items.map(it => `
+// One renderer for the line item table means an invoice always shows the same
+// descriptions, quantities and prices as the quote it came from.
+function docItemsTable(items, totals) {
+    const rowsHtml = items.map(it => `
         <tr>
             <td>${escapeHtml(it.name)}</td>
             <td style="text-align:center;">${it.qty}</td>
@@ -1817,6 +1951,30 @@ function renderQuotePdf(data) {
             <td style="text-align:right;">${money(it.qty * it.price)}</td>
         </tr>
     `).join('');
+
+    return `
+        <table>
+            <thead>
+                <tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+                <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Subtotal</td><td style="text-align:right;">${money(totals.subtotal)}</td></tr>
+            </tbody>
+        </table>`;
+}
+
+function docBankBox() {
+    return `
+        <div class="bank-box">
+            <strong>Bank Information</strong>
+            <div>${escapeHtml(businessSettings.bankName || '')}</div>
+            <div>${escapeHtml(businessSettings.bankAccountNumber || '')}</div>
+            <div>${escapeHtml(businessSettings.bankAccountHolder || '')}</div>
+        </div>`;
+}
+
+function renderQuotePdf(data) {
 
     openPrintWindow(`Quote - ${data.customerName}`, `
         <div class="page">
@@ -1839,24 +1997,10 @@ function renderQuotePdf(data) {
                 ${data.description ? `<div style="margin-top:8px;font-size:13px;color:#eceef5;">${escapeHtml(data.description)}</div>` : ''}
             </div>
 
-            <table>
-                <thead>
-                    <tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml}
-                    <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Subtotal</td><td style="text-align:right;">${money(data.totals.subtotal)}</td></tr>
-                    <tr><td colspan="3" style="text-align:right;color:#a3a7c2;">Tax (15%)</td><td style="text-align:right;">${money(data.totals.tax)}</td></tr>
-                </tbody>
-            </table>
+            ${docItemsTable(data.items, data.totals)}
 
             <div class="bottom-row">
-                <div class="bank-box">
-                    <strong>Bank Information</strong>
-                    <div>FNB</div>
-                    <div>62379192637</div>
-                    <div>Cathrine Nel</div>
-                </div>
+                ${docBankBox()}
                 <div class="total-box">
                     <strong>Total Due</strong>
                     <div class="amount">${money(data.totals.total)}</div>
@@ -1870,11 +2014,70 @@ function renderQuotePdf(data) {
     `);
 }
 
-function printInvoice(orderId) {
+// An order can always produce a quote document, whether or not the original
+// quote record still exists. If the order came from a quote we print that; if it
+// was a blank order we build the same document from the order's own line items.
+function printOrderQuote(orderId) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    const total = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    if (order.quoteId) {
+        const source = allQuotes.find(q => q.id === order.quoteId);
+        if (source) {
+            printSavedQuote(source.id);
+            return;
+        }
+    }
+
+    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+    const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    if (!items.length) {
+        items = [{
+            name: order.projectName || order.serviceType || 'Service',
+            qty: 1,
+            price: fallbackTotal
+        }];
+    }
+    const subtotal = items.reduce((sum, it) => sum + it.qty * it.price, 0) || fallbackTotal;
+
+    renderQuotePdf({
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        description: order.description,
+        notes: order.notes,
+        items,
+        totals: { subtotal, tax: 0, total: subtotal },
+        validUntil: daysFromNow(parseInt(businessSettings.quoteValidDays) || 7)
+    });
+}
+
+function printInvoice(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+        showMessage('Could not find that order.', 'error');
+        return;
+    }
+
+    // Invoices are built from the line items the order was quoted from, so the
+    // wording, quantities and prices match the quote the customer accepted.
+    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+    if (!items.length && order.quoteId) {
+        const sourceQuote = allQuotes.find(q => q.id === order.quoteId) || quotes.find(q => q.id === order.quoteId);
+        if (sourceQuote) items = quoteLineItems(sourceQuote);
+    }
+
+    const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    if (!items.length) {
+        items = [{
+            name: order.projectName || order.serviceType || 'Service',
+            qty: 1,
+            price: fallbackTotal
+        }];
+    }
+
+    const subtotal = items.reduce((sum, it) => sum + it.qty * it.price, 0) || fallbackTotal;
+    const totals = { subtotal, tax: 0, total: subtotal };
 
     openPrintWindow(`Invoice - ${order.customerName}`, `
         <div class="page">
@@ -1897,25 +2100,12 @@ function printInvoice(orderId) {
                 <span class="paid-badge">COMPLETE</span>
             </div>
 
-            <table>
-                <thead>
-                    <tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${escapeHtml(order.projectName || order.serviceType || 'Service')}${order.description ? `<div style="color:#a3a7c2;font-size:12px;margin-top:4px;">${escapeHtml(order.description)}</div>` : ''}</td>
-                        <td style="text-align:right;">${money(total)}</td>
-                    </tr>
-                </tbody>
-            </table>
+            ${order.description ? `<div class="section" style="font-size:13px;color:#eceef5;">${escapeHtml(order.description)}</div>` : ''}
+
+            ${docItemsTable(items, totals)}
 
             <div class="bottom-row">
-                <div class="bank-box">
-                    <strong>Bank Information</strong>
-                    <div>FNB</div>
-                    <div>62379192637</div>
-                    <div>Cathrine Nel</div>
-                </div>
+                ${docBankBox()}
                 <div class="total-box">
                     <strong>Total Due</strong>
                     <div class="amount">${money(total)}</div>
@@ -1931,8 +2121,17 @@ function printInvoice(orderId) {
 
 // ============ STARTUP ============
 
+document.addEventListener('input', e => {
+    if (e.target.closest('#quoteForm, #lineItemsContainer')) markQuoteDirty();
+});
+window.addEventListener('beforeunload', e => {
+    if (!quoteDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+});
+
 resetQuoteForm();
-requireAdmin().then(ok => { if (ok) loadData(); });
+requireAdmin().then(ok => { if (ok) { loadSettings(); loadData(); } });
 </script>
 
 </body>

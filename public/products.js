@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadProducts() {
   try {
     // Fetch products from server API endpoint
-    const response = await fetch('/api/products');
+    const response = await fetch(apiUrl('/api/products'));
     if (!response.ok) throw new Error('Failed to load products');
     allProducts = await response.json();
     // Filter to only active products
@@ -85,13 +85,11 @@ function displayProducts() {
     return `
     <div class="product-card" data-product-id="${product.id}">
       <div class="product-image">
-        <img src="${product.image || product.imageUrl}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
+        <img src="${mediaUrl(product.image || product.imageUrl)}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
         ${imageCount > 1 ? `<span class="image-count">📷 ${imageCount}</span>` : ''}
       </div>
       <div class="product-info">
         <h3>${product.name}</h3>
-        <p>${product.description || 'Custom branding and printing service'}</p>
-        <div class="product-price">${priceSummary(product)}</div>
         <button class="btn-view" data-product-id="${product.id}">View Details</button>
       </div>
     </div>
@@ -114,16 +112,6 @@ function displayProducts() {
       showProductModal(productId);
     });
   });
-}
-
-// ============ PRICING ============
-
-// Pricing is quoted per print size, so the card advertises the cheapest size.
-function priceSummary(product) {
-  const sizes = product.sizes || [];
-  if (!sizes.length) return `From R${product.startsFrom || product.basePrice || 0}`;
-  const cheapest = sizes.reduce((min, s) => (s.startPrice < min.startPrice ? s : min), sizes[0]);
-  return `${cheapest.label} from R${cheapest.startPrice}`;
 }
 
 // ============ MODAL ============
@@ -184,7 +172,7 @@ function showProductModal(productId) {
     : [product.image || product.imageUrl].filter(Boolean);
 
   if (images.length) {
-    modalProductImage.src = images[0];
+    modalProductImage.src = mediaUrl(images[0]);
     modalProductImage.style.display = 'block';
     modalPlaceholderImage.style.display = 'none';
     modalProductImage.onerror = () => {
@@ -199,7 +187,7 @@ function showProductModal(productId) {
   const thumbs = document.getElementById('modalThumbnails');
   if (thumbs) {
     thumbs.innerHTML = images.length > 1
-      ? images.map((url, i) => `<img src="${url}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${url}">`).join('')
+      ? images.map((url, i) => `<img src="${mediaUrl(url)}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${mediaUrl(url)}">`).join('')
       : '';
     thumbs.querySelectorAll('.thumb').forEach(thumb => {
       thumb.addEventListener('click', () => {

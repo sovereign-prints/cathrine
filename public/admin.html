@@ -743,6 +743,7 @@
         <a href="#" data-tab="pricing" class="sidebar-link">💰 Pricing</a>
         <a href="#" data-tab="gallery" class="sidebar-link">🖼️ Gallery</a>
         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
+        <a href="#" data-tab="website" class="sidebar-link">🚀 Website</a>
         <a href="order-tracking.html" class="sidebar-link">💼 Quotes & Orders</a>
         <a href="index.html" class="sidebar-link">🏠 View Site</a>
         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
@@ -918,6 +919,27 @@
       </div>
 
       <!-- SETTINGS TAB -->
+      <div id="website" class="tab-content">
+        <div class="section">
+          <h2>Website</h2>
+          <p style="color:#555; max-width:60ch;">
+            Everything you change here &mdash; products, prices, gallery images and business
+            details &mdash; appears on the website straight away. You do not need to do
+            anything else.
+          </p>
+          <p style="color:#555; max-width:60ch;">
+            The button below is only needed if the website&rsquo;s <em>design or layout</em>
+            has been changed by a developer. It rebuilds the public site, which takes a few
+            minutes.
+          </p>
+          <div id="publishStatus" style="margin:1rem 0; padding:0.85rem 1rem; border-radius:8px; background:#f4f4f5;">
+            Checking&hellip;
+          </div>
+          <button type="button" class="btn" id="publishBtn" onclick="publishWebsite()">Update website now</button>
+          <div id="publishMessage" style="margin-top:0.75rem;"></div>
+        </div>
+      </div>
+
       <div id="settings" class="tab-content">
         <div class="section">
           <h2>Business Details</h2>
@@ -925,26 +947,56 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Business Name</label>
-                <input type="text" id="businessName" value="Sovereign Prints" required>
+                <input type="text" id="businessName" required>
               </div>
               <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" id="businessEmail" value="hello@sovereignprints.co.za" required>
+                <input type="email" id="businessEmail" required>
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input type="tel" id="businessPhone" value="+27 (0) 12 345 6789" required>
+                <input type="tel" id="businessPhone">
+              </div>
+              <div class="form-group">
+                <label>WhatsApp Number</label>
+                <input type="tel" id="whatsappNumber" placeholder="27840272369">
+                <small style="color:#888;">Country code, no spaces or +. This is not shown on the site &mdash; it only powers the WhatsApp button.</small>
               </div>
               <div class="form-group">
                 <label>Location/Address</label>
-                <input type="text" id="businessLocation" value="Johannesburg, South Africa" required>
+                <input type="text" id="businessLocation" required>
               </div>
             </div>
             <div class="form-group">
               <label>Tagline</label>
-              <input type="text" id="businessTagline" value="You bring it. We brand it." required>
+              <input type="text" id="businessTagline">
             </div>
+
+            <h2 style="margin-top:32px;">Banking Details</h2>
+            <p style="color:#888;font-size:14px;margin-bottom:12px;">These appear on every quote and invoice.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Bank</label>
+                <input type="text" id="bankName">
+              </div>
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" id="bankAccountNumber">
+              </div>
+              <div class="form-group">
+                <label>Account Holder</label>
+                <input type="text" id="bankAccountHolder">
+              </div>
+            </div>
+
+            <h2 style="margin-top:32px;">Quotes</h2>
+            <div class="form-group">
+              <label>Quotes valid for (days)</label>
+              <input type="number" id="quoteValidDays" min="1">
+            </div>
+
             <button type="submit" class="btn btn-primary">Save Settings</button>
+            <div id="settingsMessage" style="margin-top:12px;"></div>
           </form>
         </div>
       </div>
@@ -1273,6 +1325,65 @@
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
       const tab = document.getElementById(tabName);
       if (tab) tab.classList.add('active');
+      if (tabName === 'settings') loadBusinessSettings();
+      if (tabName === 'website') loadPublishStatus();
+    }
+
+    // WEBSITE PUBLISHING
+    function describePublishStatus(st) {
+      if (!st.configured) {
+        return '<strong>Not set up.</strong> Rebuilding the website from here has not been ' +
+               'configured yet. Your content changes still go live immediately.';
+      }
+      var lines = [];
+      if (st.publishPending) {
+        lines.push('<strong>A website update is queued.</strong> It will start shortly.');
+      }
+      if (st.lastTriggeredAt) {
+        var when = new Date(st.lastTriggeredAt).toLocaleString();
+        lines.push(st.lastStatus === 'success'
+          ? 'Last update started ' + when + '.'
+          : 'Last attempt (' + when + ') did not work: ' + (st.lastMessage || 'unknown error'));
+      } else {
+        lines.push('No website update has been run yet.');
+      }
+      lines.push(st.autoPublish
+        ? 'Automatic updates are <strong>on</strong>.'
+        : 'Automatic updates are off &mdash; content changes go live without one.');
+      return lines.join('<br>');
+    }
+
+    async function loadPublishStatus() {
+      var box = document.getElementById('publishStatus');
+      if (!box) return;
+      try {
+        const res = await fetch('/api/admin/publish');
+        if (!res.ok) throw new Error('Could not read status');
+        box.innerHTML = describePublishStatus(await res.json());
+      } catch (error) {
+        box.innerHTML = 'Could not check the website status right now.';
+      }
+    }
+
+    async function publishWebsite() {
+      var btn = document.getElementById('publishBtn');
+      var msg = document.getElementById('publishMessage');
+      btn.disabled = true;
+      var original = btn.textContent;
+      btn.textContent = 'Starting\u2026';
+      msg.innerHTML = '';
+      try {
+        const res = await fetch('/api/admin/publish', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Update failed');
+        msg.innerHTML = '<span style="color:#22c55e;">Website update started. It should be live in a few minutes.</span>';
+      } catch (error) {
+        msg.innerHTML = '<span style="color:#ef4444;">' + error.message + '</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = original;
+        loadPublishStatus();
+      }
     }
 
     // DATA LOADING
@@ -1978,10 +2089,47 @@
     }
 
     // SETTINGS
-    function saveBusinessSettings(e) {
+    const SETTINGS_FIELDS = [
+      'businessName', 'businessEmail', 'businessPhone', 'businessLocation', 'businessTagline', 'whatsappNumber',
+      'bankName', 'bankAccountNumber', 'bankAccountHolder',
+      'quoteValidDays'
+    ];
+
+    async function loadBusinessSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const { settings } = await res.json();
+        SETTINGS_FIELDS.forEach(key => {
+          const el = document.getElementById(key);
+          if (el) el.value = settings[key] ?? '';
+        });
+      } catch (error) {
+        console.error('Could not load settings:', error);
+      }
+    }
+
+    async function saveBusinessSettings(e) {
       e.preventDefault();
-      // TODO: Implement settings save
-      alert('Settings saved! (functionality coming soon)');
+      const message = document.getElementById('settingsMessage');
+      const payload = {};
+      SETTINGS_FIELDS.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) payload[key] = el.value.trim();
+      });
+
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Save failed');
+        message.innerHTML = '<span style="color:#22c55e;">Settings saved.</span>';
+      } catch (error) {
+        message.innerHTML = '<span style="color:#ef4444;">Could not save settings. Please try again.</span>';
+      }
+      setTimeout(() => { message.innerHTML = ''; }, 4000);
     }
   </script>
 
