@@ -1,0 +1,118 @@
+From 7178f19b3abee97e054ab67e354de051d823571b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 14:11:02 +0000
+Subject: [PATCH 1/2] Fix CORS rejecting the admin panel's own same-origin
+ requests
+
+Browsers send an Origin header on same-origin POST requests too. The
+allowlist introduced with the static site split did not include the web
+service's own origin, so the admin panel's login POST was rejected and the
+thrown error surfaced as a 500 -- which the admin UI reported to the user as
+an invalid password.
+
+- always allow a request whose Origin matches its own Host, so the admin
+  pages never depend on STATIC_SITE_ORIGINS being set
+- return origin:false for a disallowed origin instead of throwing, so an
+  unexpected origin simply gets no CORS headers rather than a 500
+- keep the allowlist and localhost behaviour unchanged
+
+Verified: a same-origin POST with a non-localhost Host returns 500 on the old
+code and 200 on the new; the allowlisted static origin still receives its
+Access-Control-Allow-Origin header; a foreign origin gets no CORS header and
+no error.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XHRkqpijyrVnGpHMk66YGP
+---
+ server.js | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
+
+diff --git a/server.js b/server.js
+index f9b4bee..be472a9 100644
+--- a/server.js
++++ b/server.js
+@@ -36,16 +36,27 @@ const allowedOrigins = (process.env.STATIC_SITE_ORIGINS || '')
+   .map(o => o.trim().replace(/\/$/, ''))
+   .filter(Boolean);
+ 
+-app.use(cors({
+-  origin(origin, callback) {
+-    if (!origin) return callback(null, true);
+-    if (allowedOrigins.length === 0) return callback(null, true);
+-    const normalized = origin.replace(/\/$/, '');
+-    if (allowedOrigins.includes(normalized)) return callback(null, true);
+-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return callback(null, true);
+-    return callback(new Error('Not allowed by CORS: ' + origin));
+-  }
++const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
++
++// Requests are allowed when they carry no Origin header (curl, server-to-server),
++// when the Origin is this service's own host (browsers send Origin on same-origin
++// POSTs too, so the admin pages depend on this), when the Origin is in the
++// allowlist, or when it is localhost for development. Anything else simply does
++// not receive CORS headers -- it is never turned into a 500.
++app.use(cors((req, callback) => {
++  const origin = req.headers.origin;
++  if (!origin) return callback(null, { origin: true });
++
++  const normalized = origin.replace(/\/$/, '');
++  const sameOrigin = Boolean(req.headers.host) && normalized === `${req.protocol}://${req.headers.host}`;
++  const allowed = sameOrigin
++    || allowedOrigins.length === 0
++    || allowedOrigins.includes(normalized)
++    || LOCALHOST.test(normalized);
++
++  callback(null, { origin: allowed ? origin : false });
+ }));
++
+ app.use(bodyParser.json());
+ app.use(bodyParser.urlencoded({ extended: true }));
+ app.use(cookieParser());
+-- 
+2.43.0
+
+
+From d07c67ecfc01f5cc97e9589edd9467c84128a954 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 14:18:29 +0000
+Subject: [PATCH 2/2] Fail the static build if browser storage is ever
+ introduced
+
+The customer-facing site uses no localStorage, sessionStorage or IndexedDB,
+and should stay that way. build-static.sh now greps the built output and
+exits non-zero if any of them appear, so a Render deploy fails loudly rather
+than shipping them.
+
+Verified: the build exits 1 when localStorage is present and 0 when it is not.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XHRkqpijyrVnGpHMk66YGP
+---
+ build-static.sh | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+ mode change 100644 => 100755 build-static.sh
+
+diff --git a/build-static.sh b/build-static.sh
+old mode 100644
+new mode 100755
+index a6e9a14..ef96008
+--- a/build-static.sh
++++ b/build-static.sh
+@@ -25,6 +25,14 @@ fi
+ cp -r public/images dist/images
+ [ -d public/products_images ] && cp -r public/products_images dist/products_images
+ 
++# Guard: the customer-facing site must never use browser storage. If any of
++# these appear, the build fails rather than shipping them.
++if grep -rn "localStorage\|sessionStorage\|indexedDB\|openDatabase" dist/ ; then
++  echo "ERROR: browser storage found in the built site (listed above). Remove it." >&2
++  exit 1
++fi
++echo "Checked: no browser storage used."
++
+ # Anything not matched by a file falls back to the homepage.
+ cp dist/index.html dist/404.html
+ 
+-- 
+2.43.0
+
