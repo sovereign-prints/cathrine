@@ -1,126 +1,181 @@
-// ============ ENHANCED QUOTE PAGE WITH DEBUGGING ============
-// This version includes better error handling and console logging
+// ============ QUOTE WIZARD ============
+// A 4-step guided quote request. Submits to the same POST /api/quotes endpoint
+// as before (via submitQuote() in app.js), which accepts multipart with up to
+// 8 image attachments.
+
+const FALLBACK_SERVICES = [
+  'Clothing', 'Printing', 'Vinyl', 'Vehicle Branding', 'Signage', 'Glass & Mugs'
+];
+
+let currentStep = 1;
+const TOTAL_STEPS = 4;
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('Quote page loaded');
-  setupQuoteForm();
-  // Test API connectivity on page load
-  testAPIConnectivity();
+  const wizard = document.getElementById('quoteWizard');
+  if (!wizard) return;
+
+  populateServices();
+  wireNavigation(wizard);
+  wireAttachments();
+  showStep(1);
+
+  wizard.addEventListener('submit', handleSubmit);
 });
 
-// ============ TEST API CONNECTIVITY ============
+// ============ SERVICE OPTIONS ============
 
-function testAPIConnectivity() {
-  console.log('Testing API connectivity...');
-  fetch(apiUrl('/api/products'))
-    .then(r => {
-      console.log('API response status:', r.status);
-      return r.json();
-    })
-    .then(data => {
-      console.log('✅ API is working. Products loaded:', data.length);
-    })
-    .catch(error => {
-      console.error('❌ API error:', error.message);
-      console.warn('Quote form will not work until API is accessible');
-    });
-}
+async function populateServices() {
+  const select = document.getElementById('service');
+  if (!select) return;
 
-// ============ QUOTE FORM HANDLER ============
-
-function setupQuoteForm() {
-  const quoteForm = document.getElementById('quoteForm');
-  if (!quoteForm) {
-    console.error('Quote form not found on this page');
-    return;
+  let services = FALLBACK_SERVICES;
+  try {
+    const res = await fetch(apiUrl('/api/categories'));
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) services = data;
+    }
+  } catch (e) {
+    /* keep fallback list */
   }
 
-  console.log('Quote form initialized');
-  setupAttachmentPreview();
+  const options = [...services, 'Something else'];
+  select.innerHTML = '<option value="">-- Select --</option>' +
+    options.map(s => `<option value="${s}">${s}</option>`).join('');
 
-  quoteForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    console.log('Quote form submitted');
-
-    // Collect form data
-    const formData = {
-      customerName: document.getElementById('customerName').value,
-      customerEmail: document.getElementById('customerEmail').value,
-      customerPhone: document.getElementById('customerPhone').value,
-      service: document.getElementById('service').value,
-      description: document.getElementById('description').value,
-      requirements: Array.from(document.querySelectorAll('input[name="requirements"]:checked'))
-        .map(cb => cb.value)
-        .join(', ')
-    };
-
-    console.log('Form data collected:', formData);
-
-    // Validate required fields
-    if (!formData.customerName || !formData.customerEmail || !formData.service || !formData.description) {
-      console.error('Validation failed: missing required fields');
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const attachments = getSelectedAttachments();
-    if (attachments.length > 8) {
-      alert('Please attach no more than 8 images.');
-      return;
-    }
-
-    console.log('Form validation passed, submitting...');
-
-    try {
-      const response = await submitQuote(formData, attachments);
-      console.log('Quote submission response:', response);
-
-      if (response.success) {
-        console.log('✅ Quote submitted successfully. Reference:', response.referenceNumber);
-
-        // Hide form
-        quoteForm.style.display = 'none';
-
-        // Show success message
-        const successBox = document.getElementById('quoteSuccess');
-        if (successBox) {
-          successBox.style.display = 'block';
-          document.getElementById('referenceNumber').textContent = response.referenceNumber;
-          document.getElementById('confirmEmail').textContent = formData.customerEmail;
-
-          // Scroll to success
-          successBox.scrollIntoView({ behavior: 'smooth' });
-        }
-      } else {
-        console.error('Quote submission failed:', response.error);
-        alert('Error submitting quote: ' + (response.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Exception during quote submission:', error);
-      console.error('Error stack:', error.stack);
-      alert('Error submitting quote. Please try again or contact us directly.\n\nError: ' + error.message);
-    }
-  });
+  // Prefill from ?category=... (set by the products page "Request a Quote" link).
+  const params = new URLSearchParams(location.search);
+  const wantedCategory = params.get('category');
+  if (wantedCategory) {
+    const match = options.find(o => o.toLowerCase() === wantedCategory.toLowerCase());
+    if (match) select.value = match;
+  }
+  const wantedProduct = params.get('product');
+  if (wantedProduct) {
+    const desc = document.getElementById('description');
+    if (desc && !desc.value) desc.value = `I'm interested in: ${wantedProduct}\n\n`;
+  }
 }
 
-// ============ IMAGE ATTACHMENTS ============
+// ============ STEP NAVIGATION ============
 
-function getSelectedAttachments() {
+function wireNavigation(wizard) {
+  wizard.querySelectorAll('[data-next]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      if (currentStep === 1 && selectedType() === 'browse') {
+        window.location.href = 'products.html';
+        return;
+      }
+      if (!validateStep(currentStep)) return;
+      if (currentStep < TOTAL_STEPS) showStep(currentStep + 1);
+    })
+  );
+
+  wizard.querySelectorAll('[data-prev]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      if (currentStep > 1) showStep(currentStep - 1);
+    })
+  );
+
+  // Highlight the chosen radio card.
+  const syncChoiceCards = () => {
+    wizard.querySelectorAll('.choice-card').forEach(card => {
+      const input = card.querySelector('input');
+      card.classList.toggle('selected', input && input.checked);
+    });
+  };
+  wizard.querySelectorAll('.choice-card input').forEach(input =>
+    input.addEventListener('change', syncChoiceCards)
+  );
+  syncChoiceCards();
+}
+
+function selectedType() {
+  const el = document.querySelector('input[name="quoteType"]:checked');
+  return el ? el.value : 'custom';
+}
+
+function showStep(step) {
+  currentStep = step;
+  document.querySelectorAll('.wizard-step').forEach(s => {
+    s.classList.toggle('active', Number(s.dataset.step) === step);
+  });
+  document.querySelectorAll('#wizardProgress .bar').forEach((bar, i) => {
+    bar.classList.toggle('done', i < step);
+  });
+  document.getElementById('wizardStepLabel').textContent = `Step ${step} of ${TOTAL_STEPS}`;
+  if (step === TOTAL_STEPS) renderReview();
+  document.querySelector('.wizard-step.active')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============ VALIDATION ============
+
+function setError(id, show) {
+  const el = document.getElementById('err-' + id);
+  if (el) el.hidden = !show;
+}
+
+function validateStep(step) {
+  let ok = true;
+
+  if (step === 2) {
+    const service = document.getElementById('service').value.trim();
+    const description = document.getElementById('description').value.trim();
+    setError('service', !service);
+    setError('description', !description);
+    ok = Boolean(service && description);
+  }
+
+  if (step === 3) {
+    const name = document.getElementById('customerName').value.trim();
+    const email = document.getElementById('customerEmail').value.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    setError('customerName', !name);
+    setError('customerEmail', !emailOk);
+    ok = Boolean(name && emailOk);
+  }
+
+  return ok;
+}
+
+// ============ ATTACHMENTS ============
+
+function selectedFiles() {
   const input = document.getElementById('attachments');
   return input && input.files ? Array.from(input.files) : [];
 }
 
-// Show the customer thumbnails of what they picked, so they can spot a wrong file.
-function setupAttachmentPreview() {
+function wireAttachments() {
+  const dropzone = document.getElementById('dropzone');
   const input = document.getElementById('attachments');
   const preview = document.getElementById('attachmentPreview');
-  if (!input || !preview) return;
+  if (!dropzone || !input) return;
 
-  input.addEventListener('change', () => {
+  dropzone.addEventListener('click', () => input.click());
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    input.files = e.dataTransfer.files;
+    renderPreview();
+  });
+
+  input.addEventListener('change', renderPreview);
+
+  function renderPreview() {
     preview.innerHTML = '';
-    getSelectedAttachments().forEach(file => {
+    const files = selectedFiles().slice(0, 8);
+    if (files.length > 8) {
+      alert('Please attach no more than 8 images.');
+    }
+    files.forEach(file => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         const img = document.createElement('img');
         img.src = e.target.result;
         img.alt = file.name;
@@ -129,96 +184,110 @@ function setupAttachmentPreview() {
       };
       reader.readAsDataURL(file);
     });
-  });
-}
-
-// ============ SUBMIT QUOTE FUNCTION ============
-// This function is called from app.js submitQuote()
-// But we're also providing a local version with enhanced logging
-
-async function submitQuoteWithLogging(quoteData) {
-  console.log('submitQuote called with:', quoteData);
-
-  try {
-    console.log('Sending POST request to /api/quotes');
-    console.log('Request method: POST');
-    console.log('Content-Type: application/json');
-    console.log('Payload:', JSON.stringify(quoteData, null, 2));
-
-    const response = await fetch(apiUrl(`/api/quotes`), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(quoteData)
-    });
-
-    console.log('Response received');
-    console.log('Response status:', response.status);
-    console.log('Response statusText:', response.statusText);
-    console.log('Response headers:', {
-      'content-type': response.headers.get('content-type'),
-      'content-length': response.headers.get('content-length')
-    });
-
-    // Try to parse as JSON
-    const responseData = await response.json();
-    console.log('Parsed response:', responseData);
-
-    if (!response.ok) {
-      console.error('API returned error status:', response.status);
-      throw new Error(responseData.error || `Server error: ${response.statusText}`);
-    }
-
-    return responseData;
-  } catch (error) {
-    console.error('Error in submitQuote:');
-    console.error('  Message:', error.message);
-    console.error('  Name:', error.name);
-    console.error('  Stack:', error.stack);
-    throw error;
   }
 }
 
-// ============ CONSOLE DIAGNOSTICS ============
+// ============ REVIEW ============
 
-// Add a global function for users to run diagnostics
-window.diagnoseQuoteForm = function() {
-  console.clear();
-  console.log('%c=== QUOTE FORM DIAGNOSTIC REPORT ===', 'font-size: 16px; font-weight: bold;');
-  console.log('');
+function collect() {
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  const extras = Array.from(document.querySelectorAll('input[name="extras"]:checked')).map(c => c.value);
 
-  console.log('%c1. DOM Elements Check', 'font-size: 12px; font-weight: bold;');
-  const quoteForm = document.getElementById('quoteForm');
-  console.log('✓ quoteForm element:', quoteForm ? 'Found' : '❌ NOT FOUND');
-  console.log('✓ customerName input:', document.getElementById('customerName') ? 'Found' : '❌ NOT FOUND');
-  console.log('✓ customerEmail input:', document.getElementById('customerEmail') ? 'Found' : '❌ NOT FOUND');
-  console.log('✓ service select:', document.getElementById('service') ? 'Found' : '❌ NOT FOUND');
-  console.log('✓ description textarea:', document.getElementById('description') ? 'Found' : '❌ NOT FOUND');
-  console.log('✓ quoteSuccess div:', document.getElementById('quoteSuccess') ? 'Found' : '❌ NOT FOUND');
-  console.log('');
+  return {
+    service: val('service'),
+    description: val('description'),
+    quantity: val('quantity'),
+    timeline: val('timeline'),
+    extras,
+    customerName: val('customerName'),
+    customerEmail: val('customerEmail'),
+    customerPhone: val('customerPhone'),
+    company: val('company'),
+    location: val('location'),
+    delivery: val('delivery')
+  };
+}
 
-  console.log('%c2. Function Check', 'font-size: 12px; font-weight: bold;');
-  console.log('✓ submitQuote function:', typeof submitQuote !== 'undefined' ? 'Available' : '❌ NOT DEFINED');
-  console.log('✓ submitQuoteWithLogging function:', typeof submitQuoteWithLogging !== 'undefined' ? 'Available' : '❌ NOT DEFINED');
-  console.log('');
+function renderReview() {
+  const d = collect();
+  const rows = [
+    ['Project type', d.service],
+    ['Description', d.description],
+    ['Quantity', d.quantity],
+    ['Needed by', d.timeline],
+    ['Include', d.extras.join(', ')],
+    ['Name', d.customerName],
+    ['Email', d.customerEmail],
+    ['Phone', d.customerPhone],
+    ['Company', d.company],
+    ['Town / city', d.location],
+    ['Delivery', d.delivery]
+  ].filter(([, v]) => v);
 
-  console.log('%c3. API Connectivity Test', 'font-size: 12px; font-weight: bold;');
-  fetch(apiUrl('/api/products'))
-    .then(r => r.json())
-    .then(d => {
-      console.log('✅ API WORKING - Products loaded:', d.length);
-    })
-    .catch(e => {
-      console.error('❌ API NOT WORKING -', e.message);
-    });
+  document.getElementById('reviewList').innerHTML = rows.map(([label, value]) => `
+    <li><span class="label">${label}</span><span class="value">${escapeHtml(value)}</span></li>
+  `).join('');
+}
 
-  console.log('');
-  console.log('%c4. Test Quote Submission', 'font-size: 12px; font-weight: bold;');
-  console.log('Run this to test:');
-  console.log('submitQuoteWithLogging({ customerName: "Test", customerEmail: "test@example.com", customerPhone: "", service: "Clothing", description: "Test", requirements: "" })');
-  console.log('');
-};
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
 
-// Make it easy to run diagnostics
-console.log('%c💡 Run diagnoseQuoteForm() to check quote form setup', 'color: blue; font-weight: bold;');
+// ============ SUBMIT ============
+
+// Fold the extra wizard fields (which the API has no dedicated columns for) into
+// the description and requirements text so nothing the customer entered is lost.
+function buildPayload(d) {
+  const descParts = [d.description];
+  if (d.company) descParts.push(`Company: ${d.company}`);
+  if (d.location) descParts.push(`Town/city: ${d.location}`);
+
+  const reqParts = [...d.extras];
+  if (d.quantity) reqParts.push(`Quantity: ${d.quantity}`);
+  if (d.timeline) reqParts.push(`Needed by: ${d.timeline}`);
+  if (d.delivery) reqParts.push(`Delivery: ${d.delivery}`);
+
+  return {
+    customerName: d.customerName,
+    customerEmail: d.customerEmail,
+    customerPhone: d.customerPhone,
+    service: d.service,
+    description: descParts.join('\n'),
+    requirements: reqParts.join(', ')
+  };
+}
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  if (!validateStep(2) || !validateStep(3)) {
+    showStep(!validateStep(2) ? 2 : 3);
+    return;
+  }
+
+  setError('submit', false);
+  const submitBtn = document.getElementById('wizardSubmit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending…';
+
+  const data = collect();
+  const files = selectedFiles().slice(0, 8);
+
+  try {
+    const response = await submitQuote(buildPayload(data), files);
+    if (!response || !response.success) throw new Error((response && response.error) || 'Unknown error');
+
+    document.getElementById('quoteWizard').style.display = 'none';
+    const success = document.getElementById('quoteSuccess');
+    success.style.display = 'block';
+    document.getElementById('referenceNumber').textContent = response.referenceNumber;
+    document.getElementById('confirmEmail').textContent = data.customerEmail;
+    success.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error('Quote submission failed:', err);
+    setError('submit', true);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send quote request';
+  }
+}

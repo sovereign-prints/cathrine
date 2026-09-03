@@ -37,96 +37,173 @@
   <section class="page-header">
     <div class="container">
       <h1>Get a Quote</h1>
-      <p>Tell us what you need and we'll get back to you within 24 hours.</p>
+      <p>Answer a few quick questions and we'll get back to you within 24 hours.</p>
     </div>
   </section>
 
-  <!-- Quote Form -->
+  <!-- Quote Wizard -->
   <section class="quote-section">
     <div class="container">
       <div class="quote-form-wrapper">
-        <form id="quoteForm" class="quote-form">
-          <div class="form-group">
-            <label for="customerName">Your Name *</label>
-            <input type="text" id="customerName" name="customerName" required>
+        <form id="quoteWizard" class="quote-wizard" novalidate>
+          <div class="wizard-progress" id="wizardProgress">
+            <div class="bar done"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+          <p class="wizard-step-label" id="wizardStepLabel">Step 1 of 4</p>
+
+          <!-- Step 1: Type -->
+          <div class="wizard-step active" data-step="1">
+            <h2>What do you need?</h2>
+            <p class="step-intro">Pick the option that fits best — you can add detail on the next screen.</p>
+            <div class="choice-group">
+              <label class="choice-card">
+                <input type="radio" name="quoteType" value="custom" checked>
+                <span><strong>A custom or branded project</strong><span>T-shirts, signage, vehicle branding, printing — anything made to your artwork.</span></span>
+              </label>
+              <label class="choice-card">
+                <input type="radio" name="quoteType" value="browse">
+                <span><strong>I'd like to browse products first</strong><span>See the range and print-size pricing, then come back for a quote.</span></span>
+              </label>
+            </div>
+            <div class="wizard-nav">
+              <a href="index.html" class="btn btn-secondary">Cancel</a>
+              <button type="button" class="btn btn-primary" data-next>Next &rarr;</button>
+            </div>
           </div>
 
-          <div class="form-row">
+          <!-- Step 2: Project details -->
+          <div class="wizard-step" data-step="2">
+            <h2>About your project</h2>
+            <p class="step-intro">The more you tell us, the more accurate your quote.</p>
             <div class="form-group">
-              <label for="customerEmail">Email Address *</label>
-              <input type="email" id="customerEmail" name="customerEmail" required>
+              <label for="service">What type of project? *</label>
+              <select id="service" name="service" required>
+                <option value="">-- Select --</option>
+              </select>
+              <div class="field-error" id="err-service" hidden>Please choose a project type.</div>
             </div>
             <div class="form-group">
-              <label for="customerPhone">Phone Number</label>
-              <input type="tel" id="customerPhone" name="customerPhone">
+              <label for="description">Describe what you need *</label>
+              <textarea id="description" name="description" rows="5" placeholder="What is it for? What should it say or show? Any colours, sizes or materials in mind?" required></textarea>
+              <div class="field-error" id="err-description" hidden>Please tell us a little about the project.</div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="quantity">Roughly how many?</label>
+                <input type="text" id="quantity" name="quantity" placeholder="e.g. 25 shirts, 1 vehicle">
+              </div>
+              <div class="form-group">
+                <label for="timeline">When do you need it?</label>
+                <input type="text" id="timeline" name="timeline" placeholder="e.g. within 2 weeks">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>What should the quote include?</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" name="extras" value="Design assistance"> Design help (I don't have print-ready artwork)</label>
+                <label><input type="checkbox" name="extras" value="Delivery"> Delivery / courier</label>
+                <label><input type="checkbox" name="extras" value="Installation"> Installation / application</label>
+                <label><input type="checkbox" name="extras" value="Rush / express"> Rush / express timeline</label>
+              </div>
+            </div>
+            <div class="wizard-nav">
+              <button type="button" class="btn btn-secondary" data-prev>&larr; Back</button>
+              <button type="button" class="btn btn-primary" data-next>Next &rarr;</button>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="service">What service do you need? *</label>
-            <select id="service" name="service" required>
-              <option value="">-- Select a service --</option>
-              <option value="Clothing">Clothing Branding</option>
-              <option value="Printing">Printing</option>
-              <option value="Printing &amp; Clothing">Printing &amp; Clothing</option>
-              <option value="Vinyl Cut Out">Vinyl Cut Out</option>
-              <option value="Stickers">Stickers</option>
-              <option value="Printable Iron-On Sheet">Printable Iron-On Sheet</option>
-              <option value="Vinyl">Vinyl Decals & Graphics</option>
-              <option value="Vehicle Branding">Vehicle Branding</option>
-              <option value="Glass & Mugs">Glass & Mugs</option>
-              <option value="Signage">Signage</option>
-              <option value="Other">Something Else</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="description">Tell us about your project *</label>
-            <textarea id="description" name="description" rows="5" placeholder="What do you need? Who is it for? Any special requirements?" required></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="requirements">What should we include in the quote?</label>
-            <div class="checkbox-group">
-              <label><input type="checkbox" name="requirements" value="Design"> Design assistance (if you don't have artwork)</label>
-              <label><input type="checkbox" name="requirements" value="Delivery"> Shipping/Delivery</label>
-              <label><input type="checkbox" name="requirements" value="Installation"> Installation/Application</label>
-              <label><input type="checkbox" name="requirements" value="Express"> Rush/Express Timeline</label>
+          <!-- Step 3: Contact -->
+          <div class="wizard-step" data-step="3">
+            <h2>Your details</h2>
+            <p class="step-intro">So we can send your quote and follow up.</p>
+            <div class="form-group">
+              <label for="customerName">Your name *</label>
+              <input type="text" id="customerName" name="customerName" required>
+              <div class="field-error" id="err-customerName" hidden>Please enter your name.</div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="customerEmail">Email address *</label>
+                <input type="email" id="customerEmail" name="customerEmail" required>
+                <div class="field-error" id="err-customerEmail" hidden>Please enter a valid email.</div>
+              </div>
+              <div class="form-group">
+                <label for="customerPhone">Phone number</label>
+                <input type="tel" id="customerPhone" name="customerPhone">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="company">Company / organisation</label>
+                <input type="text" id="company" name="company">
+              </div>
+              <div class="form-group">
+                <label for="location">Town / city</label>
+                <input type="text" id="location" name="location">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="delivery">Delivery preference</label>
+              <select id="delivery" name="delivery">
+                <option value="">No preference</option>
+                <option value="Collection">I'll collect</option>
+                <option value="Local delivery">Local delivery</option>
+                <option value="National courier">National courier</option>
+                <option value="On-site installation">On-site installation</option>
+              </select>
+            </div>
+            <div class="wizard-nav">
+              <button type="button" class="btn btn-secondary" data-prev>&larr; Back</button>
+              <button type="button" class="btn btn-primary" data-next>Next &rarr;</button>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="attachments">Attach reference images (optional)</label>
-            <p class="field-hint">
-              Send your artwork, a sketch, or a photo of what you'd like branded — it helps us
-              price the job accurately. JPG, PNG, GIF or WebP, up to 8 images, 10MB each.
-            </p>
-            <input type="file" id="attachments" name="attachments" accept="image/*" multiple>
-            <div id="attachmentPreview" class="attachment-preview"></div>
-          </div>
+          <!-- Step 4: Review + attachments -->
+          <div class="wizard-step" data-step="4">
+            <h2>Review &amp; send</h2>
+            <p class="step-intro">Check the details, add any reference images, and send.</p>
 
-          <button type="submit" class="btn btn-primary btn-large">Submit Quote Request</button>
+            <div class="form-group">
+              <label>Attach reference images (optional)</label>
+              <p class="field-hint">Artwork, a sketch, or a photo of what you'd like branded. JPG, PNG, GIF or WebP — up to 8 images, 10MB each.</p>
+              <div class="dropzone" id="dropzone">
+                <strong>Tap to choose files</strong> or drag them here
+              </div>
+              <input type="file" id="attachments" name="attachments" accept="image/*" multiple hidden>
+              <div id="attachmentPreview" class="attachment-preview"></div>
+            </div>
+
+            <div class="form-group">
+              <label>Summary</label>
+              <ul class="review-list" id="reviewList"></ul>
+            </div>
+
+            <div class="field-error" id="err-submit" hidden>Something went wrong sending your request. Please try again or message us on WhatsApp.</div>
+
+            <div class="wizard-nav">
+              <button type="button" class="btn btn-secondary" data-prev>&larr; Back</button>
+              <button type="submit" class="btn btn-primary" id="wizardSubmit">Send quote request</button>
+            </div>
+          </div>
         </form>
 
         <div id="quoteSuccess" class="success-message" style="display: none;">
           <h3>✓ Quote request received!</h3>
-          <p>Your quote reference number is: <strong id="referenceNumber"></strong></p>
+          <p>Your reference number is <strong id="referenceNumber"></strong> — keep it to check on your quote.</p>
           <p>We'll respond to <span id="confirmEmail"></span> within 24 hours.</p>
-          <p>You can check the status of your quote using your reference number.</p>
           <a href="index.html" class="btn btn-secondary">Back to Home</a>
         </div>
-      </div>
 
-      <!-- Info Box -->
-      <div class="info-box">
-        <h3>What happens next?</h3>
-        <ol>
-          <li>We review your requirements</li>
-          <li>We send you a detailed quote via email</li>
-          <li>You confirm and we start production</li>
-          <li>You receive updates on your project</li>
-          <li>We deliver or arrange pickup</li>
-        </ol>
+        <div class="info-box">
+          <h3>What happens next?</h3>
+          <ol>
+            <li>We review your requirements</li>
+            <li>We send you a detailed quote by email</li>
+            <li>You confirm and we start production</li>
+            <li>You receive updates on your project</li>
+            <li>We deliver or arrange collection</li>
+          </ol>
+        </div>
       </div>
     </div>
   </section>

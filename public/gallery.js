@@ -4,13 +4,25 @@
 
 let currentFilter = 'all';
 let allGalleryItems = [];
+let productCategories = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGalleryItems();
+  await loadProductCategories();
   setupCategoryTabs();
   displayGalleryItems();
   setupLightbox();
 });
+
+// Used to link a gallery item to the matching products category, when there is one.
+async function loadProductCategories() {
+  try {
+    const res = await fetch(apiUrl('/api/categories'));
+    if (res.ok) productCategories = await res.json();
+  } catch (e) {
+    productCategories = [];
+  }
+}
 
 // ============ LOAD GALLERY ITEMS ============
 
@@ -160,6 +172,18 @@ function showLightbox(galleryId) {
   lightboxImage.onerror = () => {
     lightboxImage.alt = 'Image unavailable';
   };
+
+  // Cross-link to products / quote, matching this item's category where possible.
+  const match = productCategories.find(c => c.toLowerCase() === (item.category || '').toLowerCase());
+  const productsLink = document.getElementById('lightboxProductsLink');
+  const quoteLink = document.getElementById('lightboxQuoteLink');
+  if (productsLink) {
+    productsLink.href = match ? `products.html?category=${encodeURIComponent(match)}` : 'products.html';
+    productsLink.textContent = match ? `Browse ${match} products` : 'Browse all products';
+  }
+  if (quoteLink) {
+    quoteLink.href = match ? `quote.html?category=${encodeURIComponent(match)}` : 'quote.html';
+  }
 
   // Show lightbox
   lightbox.classList.add('show');

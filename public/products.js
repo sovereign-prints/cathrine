@@ -60,11 +60,15 @@ function setupCategoryTabs() {
     });
   });
 
-  // Set "All Products" as initially active
-  const allProductsBtn = categoryTabs.querySelector('[data-category="all"]');
-  if (allProductsBtn) {
-    allProductsBtn.classList.add('active');
-  }
+  // Honour ?category=... from the homepage links; otherwise show everything.
+  const wanted = new URLSearchParams(location.search).get('category');
+  const match = wanted && uniqueCategories.find(c => c.toLowerCase() === wanted.toLowerCase());
+  const initial = match || 'all';
+
+  document.querySelectorAll('.category-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.category === initial);
+  });
+  currentFilter = initial;
 }
 
 // ============ DISPLAY PRODUCTS ============
@@ -90,7 +94,11 @@ function displayProducts() {
       </div>
       <div class="product-info">
         <h3>${product.name}</h3>
-        <button class="btn-view" data-product-id="${product.id}">View Details</button>
+        <div class="product-meta">
+          <span class="product-from">${product.startsFrom ? 'From R' + product.startsFrom : 'Quote on request'}</span>
+          ${product.turnaroundDays ? `<span class="turnaround-chip">Ready in ~${product.turnaroundDays} days</span>` : ''}
+        </div>
+        <button class="btn-view" data-product-id="${product.id}">View Details &amp; Pricing</button>
       </div>
     </div>
   `;
@@ -224,7 +232,22 @@ function showProductModal(productId) {
   }
 
   // Set specs
-  modalProductSpecs.textContent = product.specs || 'Standard printing specifications';
+  modalProductSpecs.textContent = product.specifications || product.specs || 'Standard printing specifications';
+
+  // Prefill the quote form with this product's category and name.
+  const quoteLink = document.getElementById('modalQuoteLink');
+  if (quoteLink) {
+    quoteLink.href = `quote.html?category=${encodeURIComponent(product.category)}&product=${encodeURIComponent(product.name)}`;
+  }
+
+  // Turnaround
+  const turnEl = document.getElementById('modalTurnaround');
+  if (turnEl) {
+    turnEl.textContent = product.turnaroundDays
+      ? `Typical turnaround: about ${product.turnaroundDays} working days from artwork approval.`
+      : '';
+    turnEl.style.display = product.turnaroundDays ? 'block' : 'none';
+  }
 
   // Show modal
   modal.classList.add('show');

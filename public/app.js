@@ -6,11 +6,15 @@ let categories = [];
 
 // ============ INITIALIZATION ============
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadProducts();
-  loadCategories();
-  loadServices();
+document.addEventListener('DOMContentLoaded', async () => {
   initializeHamburger();
+  // The homepage sections need product data before they render, so load first.
+  if (document.getElementById('homeCategories') || document.getElementById('featuredGrid')) {
+    await Promise.all([loadProducts(), loadCategories()]);
+    renderHomeCategories();
+    renderFeaturedProducts();
+    loadFooterServices();
+  }
 });
 
 // ============ HAMBURGER MENU ============
@@ -126,21 +130,62 @@ async function getQuoteStatus(referenceNumber) {
   }
 }
 
-// ============ SERVICES SECTION ============
+// ============ HOME: SHOP BY CATEGORY ============
 
-function loadServices() {
-  const servicesGrid = document.getElementById('servicesGrid');
-  if (!servicesGrid) return;
+// Short blurbs per category; falls back to a generic line for anything new.
+const CATEGORY_BLURBS = {
+  'Clothing': 'T-shirts, hoodies and caps branded with your logo or design.',
+  'Printing': 'Business cards, flyers, brochures and everyday print.',
+  'Vinyl': 'Cut and printed vinyl decals, stickers and wall graphics.',
+  'Vehicle Branding': 'Full and partial vehicle wraps, design included.',
+  'Signage': 'Indoor and weather-resistant outdoor signs.',
+  'Glass & Mugs': 'Custom printed mugs and glassware.'
+};
 
-  const uniqueCategories = [...new Set(products.map(p => p.category))];
+function renderHomeCategories() {
+  const grid = document.getElementById('homeCategories');
+  if (!grid) return;
 
-  servicesGrid.innerHTML = uniqueCategories.map(category => {
-    const categoryProducts = products.filter(p => p.category === category);
+  const cats = categories.length ? categories : [...new Set(products.map(p => p.category))].sort();
+
+  grid.innerHTML = cats.map(category => {
+    const count = products.filter(p => p.category === category).length;
+    const blurb = CATEGORY_BLURBS[category] || `Custom ${category.toLowerCase()} work for businesses and individuals.`;
     return `
-      <div class="service-card">
+      <a href="products.html?category=${encodeURIComponent(category)}" class="category-card">
         <h3>${category}</h3>
-        <p>${categoryProducts[0]?.description || 'Custom ' + category.toLowerCase() + ' services'}</p>
-      </div>
+        <p>${blurb}</p>
+        <span class="category-link">View ${count} product${count === 1 ? '' : 's'} &rarr;</span>
+      </a>
+    `;
+  }).join('');
+}
+
+// ============ HOME: FEATURED PRODUCTS ============
+
+function renderFeaturedProducts() {
+  const grid = document.getElementById('featuredGrid');
+  if (!grid) return;
+
+  const featured = products.slice(0, 8);
+  if (!featured.length) {
+    grid.innerHTML = '<p style="color:var(--text-light);">Products are loading — check the full range on the Products page.</p>';
+    return;
+  }
+
+  grid.innerHTML = featured.map(p => {
+    const from = p.startsFrom ? `From ${formatPrice(p.startsFrom)}` : 'Request a quote';
+    const img = mediaUrl(p.image || (p.images && p.images[0] && p.images[0].url));
+    return `
+      <a href="products.html?category=${encodeURIComponent(p.category)}" class="featured-card">
+        <div class="featured-image">
+          ${img ? `<img src="${img}" alt="${p.name}" loading="lazy">` : ''}
+        </div>
+        <div class="featured-body">
+          <h3>${p.name}</h3>
+          <span class="featured-price">${from}</span>
+        </div>
+      </a>
     `;
   }).join('');
 }
@@ -202,12 +247,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ============ INITIALIZATION COMPLETE ============
-
-// Wait a bit for page to load, then load footer services
-setTimeout(() => {
-  loadFooterServices();
-}, 100);
 
 // ============ CONTACT DETAILS ============
 // The phone number is deliberately never printed on the page. It is only ever
