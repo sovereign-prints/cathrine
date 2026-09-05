@@ -5,6 +5,11 @@
 let currentFilter = 'all';
 let allProducts = [];
 
+// Pricing is temporarily hidden from customers on the public products page
+// while it's reworked — admin keeps full pricing management either way.
+// Flip this back to true to restore prices on the storefront.
+const PRICING_VISIBLE = false;
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadProducts();
   setupCategoryTabs();
@@ -95,10 +100,10 @@ function displayProducts() {
       <div class="product-info">
         <h3>${product.name}</h3>
         <div class="product-meta">
-          <span class="product-from">${product.startsFrom ? 'From R' + product.startsFrom : 'Quote on request'}</span>
+          ${PRICING_VISIBLE ? `<span class="product-from">${product.startsFrom ? 'From R' + product.startsFrom : 'Quote on request'}</span>` : ''}
           ${product.turnaroundDays ? `<span class="turnaround-chip">Ready in ~${product.turnaroundDays} days</span>` : ''}
         </div>
-        <button class="btn-view" data-product-id="${product.id}">View Details &amp; Pricing</button>
+        <button class="btn-view" data-product-id="${product.id}">View Details${PRICING_VISIBLE ? ' &amp; Pricing' : ''}</button>
       </div>
     </div>
   `;
@@ -208,27 +213,41 @@ function showProductModal(productId) {
     });
   }
 
-  // Set pricing table — priced by print size, not by quantity
-  const sizes = product.sizes || [];
-  pricingTable.innerHTML = sizes.length
-    ? `
-      <tr>
-        <th>Print Size</th>
-        <th>Starting Price</th>
-      </tr>
-      ${sizes.map(s => `
+  // Set pricing table — priced by print size, not by quantity.
+  // Hidden from customers for now (PRICING_VISIBLE) while admin still manages it.
+  const pricingSection = document.getElementById('modalPricingSection');
+  if (!PRICING_VISIBLE) {
+    if (pricingSection) pricingSection.style.display = 'none';
+    else if (pricingTable) pricingTable.style.display = 'none';
+  } else {
+    if (pricingSection) pricingSection.style.display = '';
+    else if (pricingTable) pricingTable.style.display = '';
+
+    const sizes = product.sizes || [];
+    pricingTable.innerHTML = sizes.length
+      ? `
         <tr>
-          <td>${s.label}</td>
-          <td>From R${s.startPrice}</td>
+          <th>Print Size</th>
+          <th>Starting Price</th>
         </tr>
-      `).join('')}
-    `
-    : '<tr><td>Contact us for pricing on this item.</td></tr>';
+        ${sizes.map(s => `
+          <tr>
+            <td>${s.label}</td>
+            <td>From R${s.startPrice}</td>
+          </tr>
+        `).join('')}
+      `
+      : '<tr><td>Contact us for pricing on this item.</td></tr>';
+  }
 
   const noteEl = document.getElementById('modalPricingNote');
   if (noteEl) {
-    noteEl.textContent = product.pricingNote || '';
-    noteEl.style.display = product.pricingNote ? 'block' : 'none';
+    if (!PRICING_VISIBLE) {
+      noteEl.style.display = 'none';
+    } else {
+      noteEl.textContent = product.pricingNote || '';
+      noteEl.style.display = product.pricingNote ? 'block' : 'none';
+    }
   }
 
   // Set specs

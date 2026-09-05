@@ -173,6 +173,10 @@ function renderFeaturedProducts() {
     return;
   }
 
+  // Pricing is temporarily hidden from customers site-wide while it's
+  // reworked — admin still manages it in full.
+  const PRICING_VISIBLE = false;
+
   grid.innerHTML = featured.map(p => {
     const from = p.startsFrom ? `From ${formatPrice(p.startsFrom)}` : 'Request a quote';
     const img = mediaUrl(p.image || (p.images && p.images[0] && p.images[0].url));
@@ -183,7 +187,7 @@ function renderFeaturedProducts() {
         </div>
         <div class="featured-body">
           <h3>${p.name}</h3>
-          <span class="featured-price">${from}</span>
+          ${PRICING_VISIBLE ? `<span class="featured-price">${from}</span>` : ''}
         </div>
       </a>
     `;
