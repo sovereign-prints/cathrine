@@ -17,10 +17,22 @@ document.addEventListener('DOMContentLoaded', () => {
   populateServices();
   wireNavigation(wizard);
   wireAttachments();
+  wireCheckboxGroups(wizard);
   showStep(1);
 
   wizard.addEventListener('submit', handleSubmit);
 });
+
+// Toggling a checkbox should visibly change its row so it's obvious more than
+// one can be picked. CSS :has() covers modern browsers; this class toggle is
+// the fallback for anything older, and doubles as a belt-and-braces check.
+function wireCheckboxGroups(wizard) {
+  wizard.querySelectorAll('.checkbox-group input[type="checkbox"]').forEach(input => {
+    const sync = () => input.closest('label')?.classList.toggle('checked', input.checked);
+    input.addEventListener('change', sync);
+    sync();
+  });
+}
 
 // ============ SERVICE OPTIONS ============
 
@@ -62,10 +74,6 @@ async function populateServices() {
 function wireNavigation(wizard) {
   wizard.querySelectorAll('[data-next]').forEach(btn =>
     btn.addEventListener('click', () => {
-      if (currentStep === 1 && selectedType() === 'browse') {
-        window.location.href = 'products.html';
-        return;
-      }
       if (!validateStep(currentStep)) return;
       if (currentStep < TOTAL_STEPS) showStep(currentStep + 1);
     })
@@ -88,11 +96,6 @@ function wireNavigation(wizard) {
     input.addEventListener('change', syncChoiceCards)
   );
   syncChoiceCards();
-}
-
-function selectedType() {
-  const el = document.querySelector('input[name="quoteType"]:checked');
-  return el ? el.value : 'custom';
 }
 
 function showStep(step) {

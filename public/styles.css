@@ -1013,24 +1013,36 @@ body {
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .checkbox-group label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-weight: 400;
   margin: 0;
   min-height: 40px;
-  padding: 8px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #34395c);
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.checkbox-group label:has(input:checked),
+.checkbox-group label.checked {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: var(--primary, #6366f1);
 }
 
 .checkbox-group input {
   width: auto;
-  min-width: 18px;
-  min-height: 18px;
+  min-width: 20px;
+  min-height: 20px;
   cursor: pointer;
+  accent-color: var(--primary, #6366f1);
 }
 
 /* Quote form image attachments */
