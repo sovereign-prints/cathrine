@@ -1982,10 +1982,22 @@ function openPrintWindow(title, bodyHtml) {
         }
     };
 
-    // Print once the frame's own load event fires, with a timeout as a backstop
-    // in case the web font or logo never resolves.
-    frame.onload = doPrint;
-    setTimeout(doPrint, 1200);
+    // The iframe's own load event fires once its HTML is parsed — well before
+    // the logo <img> inside it has actually finished downloading. Printing at
+    // that point is a race: whichever document happens to hit an already
+    // browser-cached logo.png looks fine, and whichever hits it first (usually
+    // the very first quote/invoice printed in a session) can render without
+    // the logo. Waiting for the logo image itself removes that race; the
+    // timeout is only a backstop in case the image is missing or blocked.
+    const waitForLogo = () => new Promise(resolve => {
+        const img = doc.querySelector('.logo img');
+        if (!img || img.complete) return resolve();
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+    });
+
+    frame.onload = () => { waitForLogo().then(doPrint); };
+    setTimeout(doPrint, 1800);
 }
 
 // One renderer for the line item table means an invoice always shows the same
@@ -2155,11 +2167,11 @@ function printInvoice(orderId) {
             </div>
 
             <div class="section">
-                <h3>Bill to</h3>
+                <h3>Billed to</h3>
                 <div class="client-name">${escapeHtml(order.customerName)}</div>
                 ${order.customerEmail ? `<div style="color:#a3a7c2;font-size:13px;">${escapeHtml(order.customerEmail)}</div>` : ''}
                 ${order.customerPhone ? `<div style="color:#a3a7c2;font-size:13px;">${escapeHtml(order.customerPhone)}</div>` : ''}
-                <span class="paid-badge">COMPLETE</span>
+                <span class="paid-badge">PAID</span>
             </div>
 
             ${order.description ? `<div class="section" style="font-size:13px;color:#eceef5;">${escapeHtml(order.description)}</div>` : ''}
@@ -2168,15 +2180,14 @@ function printInvoice(orderId) {
 
             <div class="bottom-row">
                 ${docContactBox()}
-                ${docBankBox(order.customerName)}
                 <div class="total-box">
-                    <strong>Total Due</strong>
+                    <strong>Amount Paid</strong>
                     <div class="amount">${money(totals.total)}</div>
                 </div>
             </div>
 
             ${order.notes ? `<div class="notes"><strong>Notes:</strong> ${escapeHtml(order.notes)}</div>` : ''}
-            ${docTerms()}
+            <div class="terms">Thank you for supporting Sovereign Prints. We appreciate you.</div>
         </div>
     `);
 }
