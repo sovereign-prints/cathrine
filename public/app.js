@@ -284,6 +284,9 @@ async function loadContactDetails() {
   document.querySelectorAll('[data-contact-location]').forEach(el => {
     el.textContent = settings.businessLocation ? `📍 ${settings.businessLocation}` : '';
   });
+  document.querySelectorAll('[data-contact-tagline]').forEach(el => {
+    if (settings.businessTagline) el.textContent = settings.businessTagline;
+  });
 }
 
 loadContactDetails();

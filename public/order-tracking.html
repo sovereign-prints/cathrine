@@ -1997,7 +1997,12 @@ function openPrintWindow(title, bodyHtml) {
     });
 
     frame.onload = () => { waitForLogo().then(doPrint); };
-    setTimeout(doPrint, 1800);
+    // Backstop for browsers where the iframe's load event never reaches this
+    // handler (e.g. because it fired synchronously during doc.close(), before
+    // this listener was attached). This must still wait for the logo itself —
+    // calling doPrint() directly here would reopen the exact race described
+    // above and print without the logo whenever this timeout is what fires.
+    setTimeout(() => { waitForLogo().then(doPrint); }, 1800);
 }
 
 // One renderer for the line item table means an invoice always shows the same
@@ -2089,21 +2094,20 @@ function renderQuotePdf(data) {
 }
 
 // An order can always produce a quote document, whether or not the original
-// quote record still exists. If the order came from a quote we print that; if it
-// was a blank order we build the same document from the order's own line items.
+// quote record still exists. The order's own line items take priority — once
+// an admin edits an order (e.g. adding Labour or a Delivery Fee line), that
+// edit must show up here. We only fall back to the original quote's stored
+// line items when the order doesn't have any of its own yet.
 function printOrderQuote(orderId) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    if (order.quoteId) {
+    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+    if (!items.length && order.quoteId) {
         const source = allQuotes.find(q => q.id === order.quoteId);
-        if (source) {
-            printSavedQuote(source.id);
-            return;
-        }
+        if (source) items = quoteLineItems(source);
     }
 
-    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
     const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
     if (!items.length) {
         items = [{

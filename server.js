@@ -49,6 +49,13 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// This service is the API + admin backend only; the customer-facing site is
+// the separate Render Static Site (see render.yaml / build-static.sh). Someone
+// landing on this service's bare root should reach the admin login, not a
+// second copy of the public homepage that also happens to be served from here.
+app.get('/', (req, res) => res.redirect('/admin.html'));
+
 app.use(express.static('public'));
 
 // File upload configuration - files are stored in the database, not on disk,

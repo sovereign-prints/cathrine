@@ -1,0 +1,156 @@
+From f90ab65704f74ed4dfb9324de4bb99240bfc2b0e Mon Sep 17 00:00:00 2001
+From: Claude Sonnet 5 <noreply@anthropic.com>
+Date: Mon, 7 Sep 2026 09:11:58 +0000
+Subject: [PATCH] Fix quote PDF logo race, stale tagline, and dropped
+ labour/delivery line items
+
+- openPrintWindow: the 1.8s print fallback called doPrint() directly,
+  bypassing the logo-load wait entirely. If the iframe's load event fired
+  late (or not at all, e.g. because it happened synchronously during
+  doc.close() before the listener was attached) and the fallback timer is
+  what triggers printing, the logo image had no guarantee of being loaded
+  yet. Now the fallback also waits for the logo before printing.
+
+- printOrderQuote: whenever an order had a linked quoteId, this
+  unconditionally reprinted the ORIGINAL quote's stored line items via
+  printSavedQuote(), ignoring the order's own lineItems entirely. So
+  Labour / Delivery Fee rows added later via "Edit Order" never showed up
+  on the printed Quote (though they always worked correctly on the
+  Invoice, which already read order.lineItems first). Order line items now
+  take priority, falling back to the source quote's items only when the
+  order has none of its own - matching printInvoice's existing behavior.
+
+- loadContactDetails (app.js) fetched businessTagline from /api/settings
+  but never applied it anywhere. The tagline shown on index.html,
+  quote.html, products.html and gallery.html was a hardcoded literal
+  ("You bring it. We brand it.") that Settings had no way to affect. Added
+  a data-contact-tagline hook to all four pages and wired it up the same
+  way as the existing email/location hooks.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BQ6TyPJYWyobqGBSY1neoM
+---
+ public/app.js              |  3 +++
+ public/gallery.html        |  2 +-
+ public/index.html          |  2 +-
+ public/order-tracking.html | 22 +++++++++++++---------
+ public/products.html       |  2 +-
+ public/quote.html          |  2 +-
+ 6 files changed, 20 insertions(+), 13 deletions(-)
+
+diff --git a/public/app.js b/public/app.js
+index f0d5a6d..5022580 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -284,6 +284,9 @@ async function loadContactDetails() {
+   document.querySelectorAll('[data-contact-location]').forEach(el => {
+     el.textContent = settings.businessLocation ? `📍 ${settings.businessLocation}` : '';
+   });
++  document.querySelectorAll('[data-contact-tagline]').forEach(el => {
++    if (settings.businessTagline) el.textContent = settings.businessTagline;
++  });
+ }
+ 
+ loadContactDetails();
+diff --git a/public/gallery.html b/public/gallery.html
+index 18e57e6..e914003 100644
+--- a/public/gallery.html
++++ b/public/gallery.html
+@@ -267,7 +267,7 @@
+           <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark">
+           <div>
+             <h1>Sovereign Prints</h1>
+-            <p class="tagline">You bring it. We brand it.</p>
++            <p class="tagline" data-contact-tagline>You bring it. We brand it.</p>
+           </div>
+         </div>
+       </a>
+diff --git a/public/index.html b/public/index.html
+index 0661442..a4a78cc 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -15,7 +15,7 @@
+           <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark">
+           <div>
+             <h1>Sovereign Prints</h1>
+-            <p class="tagline">You bring it. We brand it.</p>
++            <p class="tagline" data-contact-tagline>You bring it. We brand it.</p>
+           </div>
+         </div>
+       </a>
+diff --git a/public/order-tracking.html b/public/order-tracking.html
+index 9d624e1..c33b450 100644
+--- a/public/order-tracking.html
++++ b/public/order-tracking.html
+@@ -1997,7 +1997,12 @@ function openPrintWindow(title, bodyHtml) {
+     });
+ 
+     frame.onload = () => { waitForLogo().then(doPrint); };
+-    setTimeout(doPrint, 1800);
++    // Backstop for browsers where the iframe's load event never reaches this
++    // handler (e.g. because it fired synchronously during doc.close(), before
++    // this listener was attached). This must still wait for the logo itself —
++    // calling doPrint() directly here would reopen the exact race described
++    // above and print without the logo whenever this timeout is what fires.
++    setTimeout(() => { waitForLogo().then(doPrint); }, 1800);
+ }
+ 
+ // One renderer for the line item table means an invoice always shows the same
+@@ -2089,21 +2094,20 @@ function renderQuotePdf(data) {
+ }
+ 
+ // An order can always produce a quote document, whether or not the original
+-// quote record still exists. If the order came from a quote we print that; if it
+-// was a blank order we build the same document from the order's own line items.
++// quote record still exists. The order's own line items take priority — once
++// an admin edits an order (e.g. adding Labour or a Delivery Fee line), that
++// edit must show up here. We only fall back to the original quote's stored
++// line items when the order doesn't have any of its own yet.
+ function printOrderQuote(orderId) {
+     const order = orders.find(o => o.id === orderId);
+     if (!order) return;
+ 
+-    if (order.quoteId) {
++    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
++    if (!items.length && order.quoteId) {
+         const source = allQuotes.find(q => q.id === order.quoteId);
+-        if (source) {
+-            printSavedQuote(source.id);
+-            return;
+-        }
++        if (source) items = quoteLineItems(source);
+     }
+ 
+-    let items = Array.isArray(order.lineItems) ? order.lineItems : [];
+     const fallbackTotal = parseFloat((order.quotedPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+     if (!items.length) {
+         items = [{
+diff --git a/public/products.html b/public/products.html
+index 9825aca..45ab3c2 100644
+--- a/public/products.html
++++ b/public/products.html
+@@ -364,7 +364,7 @@
+           <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark">
+           <div>
+             <h1>Sovereign Prints</h1>
+-            <p class="tagline">You bring it. We brand it.</p>
++            <p class="tagline" data-contact-tagline>You bring it. We brand it.</p>
+           </div>
+         </div>
+       </a>
+diff --git a/public/quote.html b/public/quote.html
+index 0dd08ae..5a2c45c 100644
+--- a/public/quote.html
++++ b/public/quote.html
+@@ -15,7 +15,7 @@
+           <img src="images/logo.png" alt="Sovereign Prints" class="logo-mark">
+           <div>
+             <h1>Sovereign Prints</h1>
+-            <p class="tagline">You bring it. We brand it.</p>
++            <p class="tagline" data-contact-tagline>You bring it. We brand it.</p>
+           </div>
+         </div>
+       </a>
+-- 
+2.43.0
+
