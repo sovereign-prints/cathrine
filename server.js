@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 require('dotenv').config();
 
 const db = require('./db');
@@ -56,7 +57,7 @@ app.use(cookieParser());
 // second copy of the public homepage that also happens to be served from here.
 app.get('/', (req, res) => res.redirect('/admin.html'));
 
-app.use(express.static('public'));
+app.use(express.static('public', { maxAge: '1d' }));
 
 // File upload configuration - files are stored in the database, not on disk,
 // so uploads survive redeploys/restarts on ephemeral hosting.
@@ -73,11 +74,54 @@ const upload = multer({
   }
 });
 
+// Product/gallery photos are customer/admin uploads of arbitrary size (often
+// 600KB-1MB+ straight off a phone camera). Resizing to a sane max dimension
+// and re-encoding as compressed JPEG keeps every page that lists many of
+// these images (Products, Gallery, homepage) fast to load, without needing a
+// CDN or client-side lazy-loading to fully compensate. Non-image uploads
+// (e.g. quote attachments like PDFs) are stored as-is.
+const MAX_IMAGE_DIMENSION = 1600; // px, longest edge
+const IMAGE_JPEG_QUALITY = 80;
+
+async function processImageBuffer(buffer) {
+  try {
+    return await sharp(buffer)
+      .rotate() // respect EXIF orientation before stripping metadata
+      .resize({
+        width: MAX_IMAGE_DIMENSION,
+        height: MAX_IMAGE_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: IMAGE_JPEG_QUALITY, mozjpeg: true })
+      .toBuffer();
+  } catch (err) {
+    // Not a raster image sharp can decode (or already corrupt) - fall back
+    // to storing the original rather than failing the whole upload.
+    console.warn('Image processing skipped, storing original:', err.message);
+    return null;
+  }
+}
+
 async function saveUploadedFile(file) {
-  const id = crypto.randomUUID() + path.extname(file.originalname).toLowerCase();
+  const isImage = /^image\//.test(file.mimetype) && !/svg/.test(file.mimetype);
+  let buffer = file.buffer;
+  let mimetype = file.mimetype;
+  let extname = path.extname(file.originalname).toLowerCase();
+
+  if (isImage) {
+    const processed = await processImageBuffer(file.buffer);
+    if (processed) {
+      buffer = processed;
+      mimetype = 'image/jpeg';
+      extname = '.jpg';
+    }
+  }
+
+  const id = crypto.randomUUID() + extname;
   await db.query(
     'INSERT INTO files (id, filename, mimetype, data) VALUES ($1, $2, $3, $4)',
-    [id, file.originalname, file.mimetype, file.buffer]
+    [id, file.originalname, mimetype, buffer]
   );
   return `/uploads/${id}`;
 }
@@ -1214,8 +1258,8 @@ app.use((err, req, res, next) => {
 });
 
 // Serve pre-packaged sample images committed to the repo
-app.use('/gallery_images', express.static('gallery_images'));
-app.use('/products_images', express.static('products_images'));
+app.use('/gallery_images', express.static('gallery_images', { maxAge: '30d' }));
+app.use('/products_images', express.static('products_images', { maxAge: '30d' }));
 
 // ============ STARTUP ============
 

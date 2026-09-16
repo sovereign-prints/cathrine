@@ -94,7 +94,7 @@ function displayProducts() {
     return `
     <div class="product-card" data-product-id="${product.id}">
       <div class="product-image">
-        <img src="${mediaUrl(product.image || product.imageUrl)}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover; display:block;">
+        <img src="${mediaUrl(product.image || product.imageUrl)}" alt="${product.name}" loading="lazy" decoding="async" style="width:100%; height:100%; object-fit:cover; display:block;">
         ${imageCount > 1 ? `<span class="image-count">📷 ${imageCount}</span>` : ''}
       </div>
       <div class="product-info">
@@ -200,7 +200,7 @@ function showProductModal(productId) {
   const thumbs = document.getElementById('modalThumbnails');
   if (thumbs) {
     thumbs.innerHTML = images.length > 1
-      ? images.map((url, i) => `<img src="${mediaUrl(url)}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${mediaUrl(url)}">`).join('')
+      ? images.map((url, i) => `<img src="${mediaUrl(url)}" alt="View ${i + 1}" class="thumb${i === 0 ? ' active' : ''}" data-url="${mediaUrl(url)}" loading="lazy" decoding="async">`).join('')
       : '';
     thumbs.querySelectorAll('.thumb').forEach(thumb => {
       thumb.addEventListener('click', () => {
