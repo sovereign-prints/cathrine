@@ -173,9 +173,8 @@ function renderFeaturedProducts() {
     return;
   }
 
-  // Pricing is temporarily hidden from customers site-wide while it's
-  // reworked — admin still manages it in full.
-  const PRICING_VISIBLE = false;
+  // Pricing is now shown to customers site-wide.
+  const PRICING_VISIBLE = true;
 
   grid.innerHTML = featured.map(p => {
     const from = p.startsFrom ? `From ${formatPrice(p.startsFrom)}` : 'Request a quote';

@@ -5,10 +5,8 @@
 let currentFilter = 'all';
 let allProducts = [];
 
-// Pricing is temporarily hidden from customers on the public products page
-// while it's reworked — admin keeps full pricing management either way.
-// Flip this back to true to restore prices on the storefront.
-const PRICING_VISIBLE = false;
+// Pricing is now shown to customers on the public products page.
+const PRICING_VISIBLE = true;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadProducts();
