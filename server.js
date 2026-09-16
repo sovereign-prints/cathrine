@@ -59,11 +59,12 @@ app.get('/', (req, res) => res.redirect('/admin.html'));
 
 // This service is admin/API only. The customer-facing pages live solely on
 // the separate Render Static Site (sovereignprints.onrender.com) — someone
-// landing on this URL should never see a second, unstyled copy of the public
-// site. Block direct requests for those pages here; everything else (shared
-// JS/CSS/image assets, and the API routes below) is left untouched.
+// landing on this URL, intentionally or by an old/leaked link, should get a
+// plain 404 (not a redirect into the admin login, which would just advertise
+// that a login page exists here). Everything else (shared JS/CSS/image
+// assets, and the API routes below) is left untouched.
 const CUSTOMER_PAGES = ['index.html', 'products.html', 'quote.html', 'gallery.html', 'order-tracking.html'];
-app.get(CUSTOMER_PAGES.map(p => '/' + p), (req, res) => res.redirect('/admin.html'));
+app.get(CUSTOMER_PAGES.map(p => '/' + p), (req, res) => res.status(404).send('Not found'));
 
 app.use(express.static('public', { maxAge: '1d' }));
 
