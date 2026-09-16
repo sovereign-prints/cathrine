@@ -57,6 +57,14 @@ app.use(cookieParser());
 // second copy of the public homepage that also happens to be served from here.
 app.get('/', (req, res) => res.redirect('/admin.html'));
 
+// This service is admin/API only. The customer-facing pages live solely on
+// the separate Render Static Site (sovereignprints.onrender.com) — someone
+// landing on this URL should never see a second, unstyled copy of the public
+// site. Block direct requests for those pages here; everything else (shared
+// JS/CSS/image assets, and the API routes below) is left untouched.
+const CUSTOMER_PAGES = ['index.html', 'products.html', 'quote.html', 'gallery.html', 'order-tracking.html'];
+app.get(CUSTOMER_PAGES.map(p => '/' + p), (req, res) => res.redirect('/admin.html'));
+
 app.use(express.static('public', { maxAge: '1d' }));
 
 // File upload configuration - files are stored in the database, not on disk,
