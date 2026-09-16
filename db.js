@@ -190,7 +190,8 @@ async function initSchema() {
       product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       size_label TEXT NOT NULL,
       start_price NUMERIC NOT NULL,
-      display_order INTEGER DEFAULT 0
+      display_order INTEGER DEFAULT 0,
+      size_group TEXT NOT NULL DEFAULT 'unit'
     );
 
     CREATE TABLE IF NOT EXISTS product_images (
@@ -199,6 +200,12 @@ async function initSchema() {
       image_url TEXT NOT NULL,
       display_order INTEGER DEFAULT 0
     );
+  `);
+
+  // product_sizes may already exist from before sizes were split into groups —
+  // add the column and backfill it rather than relying on CREATE TABLE.
+  await query(`
+    ALTER TABLE product_sizes ADD COLUMN IF NOT EXISTS size_group TEXT NOT NULL DEFAULT 'unit';
   `);
 
   await seedDefaultProducts();

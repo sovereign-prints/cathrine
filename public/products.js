@@ -224,19 +224,21 @@ function showProductModal(productId) {
     else if (pricingTable) pricingTable.style.display = '';
 
     const sizes = product.sizes || [];
-    pricingTable.innerHTML = sizes.length
-      ? `
+    const unitSizes = sizes.filter(s => (s.group || 'unit') === 'unit');
+    const printSizes = sizes.filter(s => s.group === 'print');
+
+    const renderGroup = (title, list) => !list.length ? '' : `
+      <tr><th colspan="2">${title}</th></tr>
+      ${list.map(s => `
         <tr>
-          <th>Print Size</th>
-          <th>Starting Price</th>
+          <td>${s.label}</td>
+          <td>From R${s.startPrice}</td>
         </tr>
-        ${sizes.map(s => `
-          <tr>
-            <td>${s.label}</td>
-            <td>From R${s.startPrice}</td>
-          </tr>
-        `).join('')}
-      `
+      `).join('')}
+    `;
+
+    pricingTable.innerHTML = sizes.length
+      ? renderGroup('Unit Cost', unitSizes) + renderGroup('Print Cost', printSizes)
       : '<tr><td>Contact us for pricing on this item.</td></tr>';
   }
 

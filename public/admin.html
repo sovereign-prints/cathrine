@@ -418,6 +418,29 @@
       letter-spacing: 0.5px;
     }
 
+    .pricing-group-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 18px 0 8px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .pricing-group-label:first-of-type {
+      margin-top: 4px;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .pricing-group-hint {
+      font-size: 12px;
+      color: var(--text-light);
+      margin: -6px 0 10px;
+    }
+
     @media (max-width: 600px) {
       .size-row {
         grid-template-columns: 1fr 110px 44px;
@@ -907,11 +930,12 @@
       <!-- PRICING TAB -->
       <div id="pricing" class="tab-content">
         <div class="section">
-          <h2>Print Size Pricing</h2>
+          <h2>Pricing</h2>
           <p>
-            Pricing is per print size, not per quantity — A5 starts at R50, A4 at R100.
-            Set a starting price for each size you offer on a product, and use the note to
-            explain that the detail in a design changes the final cost.
+            Each product has two separate sections: <strong>Unit Cost</strong> (the price per item,
+            e.g. Below 15 units / 15+ units) and <strong>Print Cost</strong> (what a print size or
+            location adds, e.g. 20 x 30cm). Add as many rows as you need to each section and use the
+            note to explain anything that changes the final cost.
           </p>
         </div>
 
@@ -1820,7 +1844,14 @@
       }
     }
 
-    // PRICING — starting price per print size, for each product
+    // PRICING — each product has two clearly separated groups of rows:
+    // "unit" (price per item at a quantity break, e.g. below/above 15 units)
+    // and "print" (the cost added for a print size or location, e.g. 20 x 30cm).
+    const PRICING_GROUPS = [
+      { key: 'unit', label: 'Unit Cost', hint: 'Price per item, e.g. by quantity break (Below 15 units / 15+ units).', placeholder: '15+ units' },
+      { key: 'print', label: 'Print Cost', hint: 'Cost added for a print size or location, e.g. 20 x 30cm.', placeholder: '20 x 30cm' }
+    ];
+
     function displayPricing() {
       const container = document.getElementById('pricingList');
       if (!allProducts.length) {
@@ -1832,14 +1863,17 @@
         <div class="section" data-pricing-product="${product.id}">
           <h3>${product.name} <span style="color:var(--text-light);font-weight:400;">— ${product.category}</span></h3>
 
-          <div class="size-row size-row-head">
-            <div>Print Size</div>
-            <div>Starting Price (R)</div>
-            <div></div>
-          </div>
-          <div class="sizes-container"></div>
-
-          <button type="button" class="btn btn-secondary btn-small" onclick="addSizeRow(${product.id})">+ Add Size</button>
+          ${PRICING_GROUPS.map(g => `
+            <div class="pricing-group-label">${g.label}</div>
+            <div class="pricing-group-hint">${g.hint}</div>
+            <div class="size-row size-row-head">
+              <div>Label</div>
+              <div>Price (R)</div>
+              <div></div>
+            </div>
+            <div class="sizes-container" data-group="${g.key}"></div>
+            <button type="button" class="btn btn-secondary btn-small" onclick="addSizeRow(${product.id}, '${g.key}')">+ Add ${g.label} Row</button>
+          `).join('')}
 
           <div class="form-group" style="margin-top:16px;">
             <label>Pricing Note (shown to customers)</label>
@@ -1854,21 +1888,29 @@
 
       allProducts.forEach(product => {
         const sizes = product.sizes && product.sizes.length ? product.sizes : [];
-        sizes.forEach(size => addSizeRow(product.id, size));
-        if (!sizes.length) addSizeRow(product.id);
+        PRICING_GROUPS.forEach(g => {
+          const groupSizes = sizes.filter(s => (s.group || 'unit') === g.key);
+          if (groupSizes.length) {
+            groupSizes.forEach(size => addSizeRow(product.id, g.key, size));
+          } else if (g.key === 'unit') {
+            // Every product should have at least one unit-cost row to start from.
+            addSizeRow(product.id, g.key);
+          }
+        });
       });
     }
 
-    function addSizeRow(productId, size) {
-      const section = document.querySelector(`[data-pricing-product="${productId}"] .sizes-container`);
+    function addSizeRow(productId, group, size) {
+      const section = document.querySelector(`[data-pricing-product="${productId}"] .sizes-container[data-group="${group}"]`);
       if (!section) return;
 
+      const groupInfo = PRICING_GROUPS.find(g => g.key === group) || PRICING_GROUPS[0];
       const row = document.createElement('div');
       row.className = 'size-row';
       row.innerHTML = `
-        <input type="text" class="size-label-input" placeholder="A4" value="${size ? size.label : ''}">
+        <input type="text" class="size-label-input" placeholder="${groupInfo.placeholder}" value="${size ? size.label : ''}">
         <input type="number" class="size-price-input" min="0" step="1" placeholder="100" value="${size ? size.startPrice : ''}">
-        <button type="button" title="Remove this size">&times;</button>
+        <button type="button" title="Remove this row">&times;</button>
       `;
       row.querySelector('button').addEventListener('click', () => row.remove());
       section.appendChild(row);
@@ -1878,12 +1920,22 @@
       const section = document.querySelector(`[data-pricing-product="${productId}"]`);
       if (!section) return;
 
-      // Scoped to the editable rows — the header row shares the .size-row class
-      // but holds no inputs.
-      const sizes = Array.from(section.querySelectorAll('.sizes-container .size-row')).map(row => ({
-        label: row.querySelector('.size-label-input').value.trim(),
-        startPrice: parseFloat(row.querySelector('.size-price-input').value) || 0
-      })).filter(size => size.label);
+      // Each group's rows are read separately and tagged with their group key
+      // — the header row shares the .size-row class but holds no inputs.
+      const sizes = [];
+      PRICING_GROUPS.forEach(g => {
+        const groupSection = section.querySelector(`.sizes-container[data-group="${g.key}"]`);
+        if (!groupSection) return;
+        Array.from(groupSection.querySelectorAll('.size-row')).forEach(row => {
+          const label = row.querySelector('.size-label-input').value.trim();
+          if (!label) return;
+          sizes.push({
+            label,
+            startPrice: parseFloat(row.querySelector('.size-price-input').value) || 0,
+            group: g.key
+          });
+        });
+      });
 
       try {
         const response = await fetch(`/api/admin/products/${productId}/sizes`, {

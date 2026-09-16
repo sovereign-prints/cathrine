@@ -133,7 +133,10 @@ function mapProduct(row, sizes, images) {
   const sizeList = (sizes || []).map(s => ({
     id: s.id,
     label: s.size_label,
-    startPrice: Number(s.start_price)
+    startPrice: Number(s.start_price),
+    // 'unit' = price per item at a quantity break (e.g. below/above 15 units),
+    // 'print' = the cost added for a print size or location (e.g. 20 x 30cm).
+    group: s.size_group || 'unit'
   }));
 
   return {
@@ -667,14 +670,18 @@ app.put('/api/admin/products/:id/sizes', adminAuth, async (req, res) => {
     }
 
     const sizes = (Array.isArray(req.body.sizes) ? req.body.sizes : [])
-      .map(s => ({ label: String(s.label || '').trim(), startPrice: Number(s.startPrice) || 0 }))
+      .map(s => ({
+        label: String(s.label || '').trim(),
+        startPrice: Number(s.startPrice) || 0,
+        group: s.group === 'print' ? 'print' : 'unit'
+      }))
       .filter(s => s.label);
 
     await db.query('DELETE FROM product_sizes WHERE product_id = $1', [id]);
     for (let i = 0; i < sizes.length; i++) {
       await db.query(
-        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order) VALUES ($1, $2, $3, $4)',
-        [id, sizes[i].label, sizes[i].startPrice, i]
+        'INSERT INTO product_sizes (product_id, size_label, start_price, display_order, size_group) VALUES ($1, $2, $3, $4, $5)',
+        [id, sizes[i].label, sizes[i].startPrice, i, sizes[i].group]
       );
     }
 
