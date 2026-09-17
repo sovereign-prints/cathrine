@@ -824,7 +824,7 @@
         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
         <a href="#" data-tab="website" class="sidebar-link">🚀 Website</a>
         <a href="order-tracking.html" class="sidebar-link">💼 Quotes & Orders</a>
-        <a href="index.html" class="sidebar-link">🏠 View Site</a>
+        <a href="https://sovereignprints.onrender.com/" target="_blank" rel="noopener" class="sidebar-link">🏠 View Site</a>
         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
       </ul>
     </aside>
@@ -1397,8 +1397,9 @@
       }
       isLoggedIn = false;
       document.getElementById('adminPassword').value = '';
-      // Logging out drops you back on the public site, not a stranded login box.
-      window.location.href = 'index.html';
+      // Logging out drops you back on the login screen (this admin service has no
+      // customer-facing pages of its own — those live on the real storefront).
+      showLoginScreen();
     }
 
     // TAB SWITCHING

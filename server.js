@@ -61,9 +61,11 @@ app.get('/', (req, res) => res.redirect('/admin.html'));
 // the separate Render Static Site (sovereignprints.onrender.com) — someone
 // landing on this URL, intentionally or by an old/leaked link, should get a
 // plain 404 (not a redirect into the admin login, which would just advertise
-// that a login page exists here). Everything else (shared JS/CSS/image
-// assets, and the API routes below) is left untouched.
-const CUSTOMER_PAGES = ['index.html', 'products.html', 'quote.html', 'gallery.html', 'order-tracking.html'];
+// that a login page exists here). order-tracking.html is NOT in this list:
+// despite the name it's the admin's own Quotes & Orders screen (uses
+// /api/admin/* endpoints), not a customer page. Everything else (shared
+// JS/CSS/image assets, and the API routes below) is left untouched.
+const CUSTOMER_PAGES = ['index.html', 'products.html', 'quote.html', 'gallery.html'];
 app.get(CUSTOMER_PAGES.map(p => '/' + p), (req, res) => res.status(404).send('Not found'));
 
 app.use(express.static('public', { maxAge: '1d' }));
