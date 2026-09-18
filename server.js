@@ -1,4 +1,5 @@
 // FIXED: Image migration now fetches from /uploads URLs instead of files table
+// DIAGNOSTIC ENDPOINT ADDED: /api/check-image-urls for debugging - 2026-09-18
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
