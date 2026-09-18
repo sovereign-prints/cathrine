@@ -1355,9 +1355,10 @@ app.get('/api/admin/migration-status', adminAuth, async (req, res) => {
 
 // POST /api/admin/migrate-images-to-cloudinary
 // Migrates all existing product_images and gallery images to Cloudinary
-// Fetches from /uploads/{id} endpoints, uploads to Cloudinary, updates database URLs
 app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) => {
   try {
+    console.log('🚀 Starting image migration...');
+
     const results = {
       product_images_found: 0,
       product_images_uploaded: 0,
@@ -1365,118 +1366,30 @@ app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) 
       gallery_images_found: 0,
       gallery_images_uploaded: 0,
       gallery_images_failed: 0,
-      product_images_updated: 0,
-      gallery_updated: 0,
       details: []
     };
 
-    // Migrate product images
-    const productImagesResult = await db.query('SELECT id, image_url FROM product_images WHERE image_url LIKE $1', ['%/uploads/%']);
-    results.product_images_found = productImagesResult.rows.length;
+    // Get ALL product images (not just /uploads/)
+    const allProductImages = await db.query('SELECT id, image_url FROM product_images');
+    console.log(`Found ${allProductImages.rows.length} total product images`);
+    allProductImages.rows.slice(0, 5).forEach(row => {
+      console.log(`  - ID: ${row.id}, URL: ${row.image_url}`);
+    });
 
-    for (const row of productImagesResult.rows) {
-      try {
-        const imageId = row.image_url.match(/\/uploads\/([a-f0-9-]+)/)?.[1];
-        if (!imageId) {
-          results.product_images_failed++;
-          results.details.push({ type: 'product', id: row.id, status: 'failed', reason: 'Could not extract image ID from URL' });
-          continue;
-        }
+    results.product_images_found = allProductImages.rows.length;
 
-        // Fetch image from backend endpoint
-        const imageResponse = await fetch(`https://cathrine.onrender.com/uploads/${imageId}`, {
-          headers: { 'User-Agent': 'CloudinaryMigration/1.0' }
-        });
+    // Get ALL gallery images
+    const allGallery = await db.query('SELECT id, image FROM gallery');
+    console.log(`Found ${allGallery.rows.length} total gallery items`);
+    allGallery.rows.slice(0, 5).forEach(row => {
+      console.log(`  - ID: ${row.id}, Image: ${row.image}`);
+    });
 
-        if (!imageResponse.ok) {
-          results.product_images_failed++;
-          results.details.push({ type: 'product', id: row.id, status: 'failed', reason: `Failed to fetch image: ${imageResponse.status}` });
-          continue;
-        }
-
-        const buffer = Buffer.from(await imageResponse.arrayBuffer());
-
-        // Upload to Cloudinary
-        const cloudinaryResponse = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder: 'sovereign-prints', public_id: imageId, resource_type: 'auto' },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          );
-          stream.end(buffer);
-        });
-
-        const cloudinaryUrl = cloudinaryResponse.secure_url;
-
-        // Update database
-        await db.query('UPDATE product_images SET image_url = $1 WHERE id = $2', [cloudinaryUrl, row.id]);
-
-        results.product_images_uploaded++;
-        results.product_images_updated++;
-        results.details.push({ type: 'product', id: row.id, status: 'success', new_url: cloudinaryUrl });
-      } catch (error) {
-        results.product_images_failed++;
-        results.details.push({ type: 'product', id: row.id, status: 'failed', reason: error.message });
-      }
-    }
-
-    // Migrate gallery images
-    const galleryResult = await db.query('SELECT id, image FROM gallery WHERE image LIKE $1', ['%/uploads/%']);
-    results.gallery_images_found = galleryResult.rows.length;
-
-    for (const row of galleryResult.rows) {
-      try {
-        const imageId = row.image.match(/\/uploads\/([a-f0-9-]+)/)?.[1];
-        if (!imageId) {
-          results.gallery_images_failed++;
-          results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: 'Could not extract image ID from URL' });
-          continue;
-        }
-
-        // Fetch image from backend endpoint
-        const imageResponse = await fetch(`https://cathrine.onrender.com/uploads/${imageId}`, {
-          headers: { 'User-Agent': 'CloudinaryMigration/1.0' }
-        });
-
-        if (!imageResponse.ok) {
-          results.gallery_images_failed++;
-          results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: `Failed to fetch image: ${imageResponse.status}` });
-          continue;
-        }
-
-        const buffer = Buffer.from(await imageResponse.arrayBuffer());
-
-        // Upload to Cloudinary
-        const cloudinaryResponse = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder: 'sovereign-prints', public_id: imageId, resource_type: 'auto' },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          );
-          stream.end(buffer);
-        });
-
-        const cloudinaryUrl = cloudinaryResponse.secure_url;
-
-        // Update database
-        await db.query('UPDATE gallery SET image = $1 WHERE id = $2', [cloudinaryUrl, row.id]);
-
-        results.gallery_images_uploaded++;
-        results.gallery_updated++;
-        results.details.push({ type: 'gallery', id: row.id, status: 'success', new_url: cloudinaryUrl });
-      } catch (error) {
-        results.gallery_images_failed++;
-        results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: error.message });
-      }
-    }
+    results.gallery_images_found = allGallery.rows.length;
 
     res.json({
       success: true,
-      message: `Migration complete. ${results.product_images_uploaded + results.gallery_images_uploaded} images uploaded, ${results.product_images_failed + results.gallery_images_failed} failed.`,
+      message: 'Migration check complete - see server logs for image URLs',
       results
     });
   } catch (error) {
