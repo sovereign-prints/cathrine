@@ -1336,146 +1336,134 @@ async function autoLoadGalleryImages() {
 }
 
 // POST /api/admin/migrate-images-to-cloudinary
-// Migrates all images from PostgreSQL to Cloudinary
-// Requires admin authentication
-
+// Migrates all existing product_images and gallery images to Cloudinary
+// Fetches from /uploads/{id} endpoints, uploads to Cloudinary, updates database URLs
 app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) => {
   try {
-    console.log('🚀 Starting image migration to Cloudinary...');
-
-    // 1. Get all files from the database
-    console.log('📦 Fetching all images from database...');
-    const { rows: files } = await db.query('SELECT id, filename, mimetype, data FROM files ORDER BY id');
-    console.log(`   Found ${files.length} images`);
-
-    if (files.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No images to migrate',
-        migrations: { success: 0, failed: 0 }
-      });
-    }
-
-    // 2. Track migrations
-    const migrations = {
-      success: [],
-      failed: []
+    const results = {
+      product_images_found: 0,
+      product_images_uploaded: 0,
+      product_images_failed: 0,
+      gallery_images_found: 0,
+      gallery_images_uploaded: 0,
+      gallery_images_failed: 0,
+      product_images_updated: 0,
+      gallery_updated: 0,
+      details: []
     };
 
-    // 3. Upload each file to Cloudinary
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const progress = `[${i + 1}/${files.length}]`;
+    // Migrate product images
+    const productImagesResult = await db.query('SELECT id, image_url FROM product_images WHERE image_url LIKE $1', ['%/uploads/%']);
+    results.product_images_found = productImagesResult.rows.length;
 
+    for (const row of productImagesResult.rows) {
       try {
-        console.log(`${progress} Uploading ${file.filename}...`);
+        const imageId = row.image_url.match(/\/uploads\/([a-f0-9-]+)/)?.[1];
+        if (!imageId) {
+          results.product_images_failed++;
+          results.details.push({ type: 'product', id: row.id, status: 'failed', reason: 'Could not extract image ID from URL' });
+          continue;
+        }
 
-        // Upload directly from buffer (Cloudinary SDK supports this)
-        const result = await new Promise((resolve, reject) => {
+        // Fetch image from backend endpoint
+        const imageResponse = await fetch(`https://cathrine.onrender.com/uploads/${imageId}`, {
+          headers: { 'User-Agent': 'CloudinaryMigration/1.0' }
+        });
+
+        if (!imageResponse.ok) {
+          results.product_images_failed++;
+          results.details.push({ type: 'product', id: row.id, status: 'failed', reason: `Failed to fetch image: ${imageResponse.status}` });
+          continue;
+        }
+
+        const buffer = await imageResponse.buffer();
+
+        // Upload to Cloudinary
+        const cloudinaryResponse = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'sovereign-prints',
-              public_id: file.id.toString(),
-              resource_type: 'auto',
-              overwrite: true
-            },
+            { folder: 'sovereign-prints', public_id: imageId, resource_type: 'auto' },
             (error, result) => {
               if (error) reject(error);
               else resolve(result);
             }
           );
-
-          stream.end(file.data);
+          stream.end(buffer);
         });
 
-        console.log(`   ✓ Uploaded to: ${result.secure_url}`);
+        const cloudinaryUrl = cloudinaryResponse.secure_url;
 
-        migrations.success.push({
-          fileId: file.id,
-          filename: file.filename,
-          cloudinaryUrl: result.secure_url,
-          cloudinaryPublicId: result.public_id
-        });
+        // Update database
+        await db.query('UPDATE product_images SET image_url = $1 WHERE id = $2', [cloudinaryUrl, row.id]);
 
-      } catch (err) {
-        console.error(`   ✗ Failed: ${err.message}`);
-        migrations.failed.push({
-          fileId: file.id,
-          filename: file.filename,
-          error: err.message
-        });
+        results.product_images_uploaded++;
+        results.product_images_updated++;
+        results.details.push({ type: 'product', id: row.id, status: 'success', new_url: cloudinaryUrl });
+      } catch (error) {
+        results.product_images_failed++;
+        results.details.push({ type: 'product', id: row.id, status: 'failed', reason: error.message });
       }
     }
 
-    console.log('\n📊 Migration Summary:');
-    console.log(`✓ Successful: ${migrations.success.length}`);
-    console.log(`✗ Failed: ${migrations.failed.length}`);
+    // Migrate gallery images
+    const galleryResult = await db.query('SELECT id, image FROM gallery WHERE image LIKE $1', ['%/uploads/%']);
+    results.gallery_images_found = galleryResult.rows.length;
 
-    // 4. Update database URLs for products and gallery
-    console.log('\n🔄 Updating database URLs...');
-    let productUpdated = 0;
-    let galleryUpdated = 0;
-
-    try {
-      // Update product images (product_images table uses image_url field)
-      const cloudinaryBaseUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/sovereign-prints/`;
-
-      for (const success of migrations.success) {
-        try {
-          // Update product_images table
-          await db.query(
-            'UPDATE product_images SET image_url = $1 WHERE image_url = $2',
-            [`${cloudinaryBaseUrl}${success.fileId}`, `/uploads/${success.fileId}`]
-          );
-          productUpdated++;
-        } catch (e) {
-          console.warn(`Could not update product image ${success.fileId}: ${e.message}`);
+    for (const row of galleryResult.rows) {
+      try {
+        const imageId = row.image.match(/\/uploads\/([a-f0-9-]+)/)?.[1];
+        if (!imageId) {
+          results.gallery_images_failed++;
+          results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: 'Could not extract image ID from URL' });
+          continue;
         }
 
-        try {
-          // Update gallery table
-          await db.query(
-            'UPDATE gallery SET image = $1 WHERE image = $2',
-            [`${cloudinaryBaseUrl}${success.fileId}`, `/uploads/${success.fileId}`]
-          );
-          galleryUpdated++;
-        } catch (e) {
-          console.warn(`Could not update gallery image ${success.fileId}: ${e.message}`);
+        // Fetch image from backend endpoint
+        const imageResponse = await fetch(`https://cathrine.onrender.com/uploads/${imageId}`, {
+          headers: { 'User-Agent': 'CloudinaryMigration/1.0' }
+        });
+
+        if (!imageResponse.ok) {
+          results.gallery_images_failed++;
+          results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: `Failed to fetch image: ${imageResponse.status}` });
+          continue;
         }
+
+        const buffer = await imageResponse.buffer();
+
+        // Upload to Cloudinary
+        const cloudinaryResponse = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: 'sovereign-prints', public_id: imageId, resource_type: 'auto' },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          stream.end(buffer);
+        });
+
+        const cloudinaryUrl = cloudinaryResponse.secure_url;
+
+        // Update database
+        await db.query('UPDATE gallery SET image = $1 WHERE id = $2', [cloudinaryUrl, row.id]);
+
+        results.gallery_images_uploaded++;
+        results.gallery_updated++;
+        results.details.push({ type: 'gallery', id: row.id, status: 'success', new_url: cloudinaryUrl });
+      } catch (error) {
+        results.gallery_images_failed++;
+        results.details.push({ type: 'gallery', id: row.id, status: 'failed', reason: error.message });
       }
-
-      console.log(`✓ Updated ${productUpdated} product images`);
-      console.log(`✓ Updated ${galleryUpdated} gallery images`);
-    } catch (err) {
-      console.warn(`Could not auto-update database: ${err.message}`);
     }
 
-    // 5. Return results
     res.json({
       success: true,
-      message: 'Image migration completed',
-      migrations: {
-        success: migrations.success.length,
-        failed: migrations.failed.length,
-        details: migrations
-      },
-      databaseUpdates: {
-        productImagesUpdated: productUpdated,
-        galleryImagesUpdated: galleryUpdated
-      },
-      nextSteps: [
-        'Verify images in Cloudinary console',
-        'Test website to confirm images load from CDN',
-        'Images should now load instantly without cold start delays'
-      ]
+      message: `Migration complete. ${results.product_images_uploaded + results.gallery_images_uploaded} images uploaded, ${results.product_images_failed + results.gallery_images_failed} failed.`,
+      results
     });
-
-  } catch (err) {
-    console.error('❌ Migration failed:', err.message);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: 'Migration failed', details: error.message });
   }
 });
 
