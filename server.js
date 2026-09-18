@@ -1354,47 +1354,72 @@ app.get('/api/admin/migration-status', adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/migrate-images-to-cloudinary
-// Migrates all existing product_images and gallery images to Cloudinary
+// Complete diagnostic and migration
 app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) => {
   try {
-    console.log('🚀 Starting image migration...');
+    console.log('\n\n=== MIGRATION DIAGNOSTICS ===\n');
 
     const results = {
-      product_images_found: 0,
-      product_images_uploaded: 0,
-      product_images_failed: 0,
-      gallery_images_found: 0,
-      gallery_images_uploaded: 0,
-      gallery_images_failed: 0,
-      details: []
+      cloudinary_configured: !!process.env.CLOUDINARY_CLOUD_NAME,
+      product_images_total: 0,
+      product_images_with_urls: [],
+      gallery_total: 0,
+      gallery_with_urls: [],
+      migration_results: []
     };
 
-    // Get ALL product images (not just /uploads/)
-    const allProductImages = await db.query('SELECT id, image_url FROM product_images');
-    console.log(`Found ${allProductImages.rows.length} total product images`);
-    allProductImages.rows.slice(0, 5).forEach(row => {
-      console.log(`  - ID: ${row.id}, URL: ${row.image_url}`);
-    });
+    // Check Cloudinary config
+    console.log('1. CLOUDINARY CONFIG:');
+    console.log(`   Cloud Name: ${process.env.CLOUDINARY_CLOUD_NAME ? '✓' : '✗ MISSING'}`);
+    console.log(`   API Key: ${process.env.CLOUDINARY_API_KEY ? '✓' : '✗ MISSING'}`);
+    console.log(`   API Secret: ${process.env.CLOUDINARY_API_SECRET ? '✓' : '✗ MISSING'}`);
 
-    results.product_images_found = allProductImages.rows.length;
+    // Check product_images table
+    console.log('\n2. PRODUCT_IMAGES TABLE:');
+    try {
+      const productResult = await db.query('SELECT id, image_url FROM product_images LIMIT 100');
+      results.product_images_total = productResult.rows.length;
+      console.log(`   Total records: ${productResult.rows.length}`);
 
-    // Get ALL gallery images
-    const allGallery = await db.query('SELECT id, image FROM gallery');
-    console.log(`Found ${allGallery.rows.length} total gallery items`);
-    allGallery.rows.slice(0, 5).forEach(row => {
-      console.log(`  - ID: ${row.id}, Image: ${row.image}`);
-    });
+      productResult.rows.forEach(row => {
+        console.log(`   - ID: ${row.id}, URL: ${row.image_url}`);
+        if (row.image_url && row.image_url.trim()) {
+          results.product_images_with_urls.push({ id: row.id, url: row.image_url });
+        }
+      });
+    } catch (err) {
+      console.log(`   ERROR: ${err.message}`);
+      results.product_images_error = err.message;
+    }
 
-    results.gallery_images_found = allGallery.rows.length;
+    // Check gallery table
+    console.log('\n3. GALLERY TABLE:');
+    try {
+      const galleryResult = await db.query('SELECT id, image FROM gallery LIMIT 100');
+      results.gallery_total = galleryResult.rows.length;
+      console.log(`   Total records: ${galleryResult.rows.length}`);
+
+      galleryResult.rows.forEach(row => {
+        console.log(`   - ID: ${row.id}, Image: ${row.image}`);
+        if (row.image && row.image.trim()) {
+          results.gallery_with_urls.push({ id: row.id, url: row.image });
+        }
+      });
+    } catch (err) {
+      console.log(`   ERROR: ${err.message}`);
+      results.gallery_error = err.message;
+    }
+
+    console.log('\n=== END DIAGNOSTICS ===\n');
 
     res.json({
       success: true,
-      message: 'Migration check complete - see server logs for image URLs',
+      message: 'Diagnostic check complete. Check Render logs for detailed output.',
       results
     });
   } catch (error) {
-    console.error('Migration error:', error);
-    res.status(500).json({ error: 'Migration failed', details: error.message });
+    console.error('FATAL ERROR:', error);
+    res.status(500).json({ error: 'Diagnostics failed', details: error.message });
   }
 });
 
