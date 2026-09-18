@@ -1,0 +1,272 @@
+From 526f91f076b496feab82ebaf9da6c1c80fad5c5e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 18 Sep 2026 12:47:41 +0200
+Subject: [PATCH] Bake product/gallery/settings data into static build to
+ eliminate cold starts
+
+The static site was already CDN-hosted and cold-start-proof, but products.js,
+gallery.js and app.js called the live API (/api/products, /api/gallery,
+/api/categories, /api/settings) on every page load to get product data,
+prices and contact details. That API runs on Render's free plan, which sleeps
+after 15 min idle, so browsing still incurred the full 10-30s cold start even
+though Cloudinary had already made image loads themselves fast.
+
+build-static.sh now fetches that data at build time and writes it into
+dist/data/*.json, shipped alongside the static pages. A new fetchData()
+helper in config.js reads that snapshot on the static site (falling back to
+the live API for local dev or if a file is missing). Browsing is now fully
+served from the CDN with no live backend dependency.
+
+Quote submission, order tracking, admin login and all admin edits are
+unchanged -- still live calls to the backend. Publishing content changes to
+the static snapshot remains a deliberate action via the existing "Update
+website now" button on the admin Website tab (publish.js, AUTO_PUBLISH stays
+off by default); its copy now reflects that content changes need a publish
+to reach visitors, not just layout changes.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0177efB2zKYqBKVDfJLKCQ5k
+---
+ build-static.sh    | 52 ++++++++++++++++++++++++++++++++++++++++++++++
+ public/admin.html  | 10 ++++-----
+ public/app.js      |  4 ++--
+ public/config.js   | 21 +++++++++++++++++++
+ public/gallery.js  | 10 ++++-----
+ public/products.js |  7 +++----
+ publish.js         | 14 ++++++++-----
+ render.yaml        | 10 ++++++---
+ 8 files changed, 103 insertions(+), 25 deletions(-)
+
+diff --git a/build-static.sh b/build-static.sh
+index a6e9a14..3965b7e 100644
+--- a/build-static.sh
++++ b/build-static.sh
+@@ -25,6 +25,58 @@ fi
+ cp -r public/images dist/images
+ [ -d public/products_images ] && cp -r public/products_images dist/products_images
+ 
++# ---------------------------------------------------------------------------
++# Data snapshot.
++#
++# products.html, gallery.html and the homepage used to call the live API
++# (GET /api/products, /api/gallery, /api/categories, /api/settings) on every
++# visit. The web service is on Render's free plan, which sleeps after 15
++# minutes idle, so that first call could cost visitors a 10-30s cold start --
++# even though the page itself (static, CDN-hosted) loaded instantly. Baking
++# a snapshot of this data into the build means browsing the site never has to
++# wait on the API waking up.
++#
++# The snapshot is only as fresh as the last publish: admin edits save to the
++# database immediately as before, but only reach the static site's data files
++# after the next build. Trigger a rebuild from the admin Website tab's
++# "Update website now" button after making content changes you want visitors
++# to see.
++#
++# The source host for this data is the same API_HOST used above.
++# ---------------------------------------------------------------------------
++DATA_HOST="${API_HOST:-https://cathrine.onrender.com}"
++DATA_HOST="${DATA_HOST%/}"
++mkdir -p dist/data
++
++# A failed fetch here must NOT ship as an empty [] -- that would replace a
++# working product/gallery listing with a blank one the moment this build is
++# published. Since dist/ is rebuilt from scratch every time, there is no
++# previous snapshot to fall back to locally, so instead the whole build fails.
++# Render then keeps serving the last successfully published version, and the
++# admin can just retry "Update website now" once the backend is responsive.
++fetch_json() {
++  local path="$1" out="$2"
++  echo "Fetching ${DATA_HOST}${path} -> dist/data/${out}"
++  if ! curl -fsS --retry 3 --retry-delay 5 --max-time 60 "${DATA_HOST}${path}" -o "dist/data/${out}"; then
++    echo "ERROR: failed to fetch ${DATA_HOST}${path} after retries. Aborting build so the" >&2
++    echo "live site is not replaced with empty data. Try 'Update website now' again once" >&2
++    echo "the backend (${DATA_HOST}) is responding." >&2
++    exit 1
++  fi
++  # -f already makes curl fail (and hit the branch above) on a non-2xx status,
++  # so a non-empty file here reflects a real 2xx JSON response from the API.
++  if [ ! -s "dist/data/${out}" ]; then
++    echo "ERROR: ${DATA_HOST}${path} returned an empty response. Aborting build so the live" >&2
++    echo "site is not replaced with empty data." >&2
++    exit 1
++  fi
++}
++
++fetch_json "/api/products" "products.json"
++fetch_json "/api/gallery" "gallery.json"
++fetch_json "/api/categories" "categories.json"
++fetch_json "/api/settings" "settings.json"
++
+ # Anything not matched by a file falls back to the homepage.
+ cp dist/index.html dist/404.html
+ 
+diff --git a/public/admin.html b/public/admin.html
+index fc73306..c8d50a9 100644
+--- a/public/admin.html
++++ b/public/admin.html
+@@ -998,13 +998,13 @@
+           <h2>Website</h2>
+           <p style="color:var(--text-light); max-width:60ch;">
+             Everything you change here &mdash; products, prices, gallery images and business
+-            details &mdash; appears on the website straight away. You do not need to do
+-            anything else.
++            details &mdash; is saved immediately. To keep the public website fast, it does not
++            look this information up live: it shows a snapshot that is only updated when you
++            click the button below.
+           </p>
+           <p style="color:var(--text-light); max-width:60ch;">
+-            The button below is only needed if the website&rsquo;s <em>design or layout</em>
+-            has been changed by a developer. It rebuilds the public site, which takes a few
+-            minutes.
++            <strong>After making changes you want customers to see, click &ldquo;Update
++            website now&rdquo;.</strong> It usually takes a few minutes to go live.
+           </p>
+           <div id="publishStatus" style="margin:1rem 0; padding:0.85rem 1rem; border-radius:8px; background:var(--surface-2); color:var(--text-light);">
+             Checking&hellip;
+diff --git a/public/app.js b/public/app.js
+index 17aa957..2aee145 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -259,8 +259,8 @@ document.addEventListener('click', (e) => {
+ async function loadContactDetails() {
+   let settings = {};
+   try {
+-    const res = await fetch(apiUrl('/api/settings'));
+-    if (res.ok) settings = (await res.json()).settings || {};
++    const data = await fetchData('settings', '/api/settings');
++    settings = data.settings || {};
+   } catch (e) {
+     return; // leave the markup as-is if settings can't be reached
+   }
+diff --git a/public/config.js b/public/config.js
+index 8c8a3e5..b31795a 100644
+--- a/public/config.js
++++ b/public/config.js
+@@ -45,6 +45,27 @@
+     return path;
+   };
+ 
++  // Product/gallery/category/settings data is baked into the static build as
++  // JSON (see build-static.sh) so browsing the site never has to wait on the
++  // API service waking up from Render's free-tier sleep. Each page asks for
++  // this data through fetchData(name, apiPath) instead of calling the API
++  // directly. On the static site this reads /data/<name>.json, which was
++  // fetched from the live API at build time. If that file is missing (local
++  // dev, or the very first deploy before a build has run) it falls back to
++  // calling the live API, so nothing breaks -- it just won't be cold-start-proof
++  // until the next publish.
++  window.fetchData = async function (name, apiPath) {
++    if (origin) {
++      try {
++        const staticRes = await fetch('/data/' + name + '.json');
++        if (staticRes.ok) return staticRes.json();
++      } catch (e) { /* fall through to live API */ }
++    }
++    const res = await fetch(window.apiUrl(apiPath));
++    if (!res.ok) throw new Error('Failed to load ' + apiPath);
++    return res.json();
++  };
++
+   // The admin pages (admin.html, order-tracking.html) are served by the web
+   // service, not the static site. Rewrite links to them at page load.
+   var ADMIN_PAGES = ['admin.html', 'order-tracking.html'];
+diff --git a/public/gallery.js b/public/gallery.js
+index 55d8579..eeba5e0 100644
+--- a/public/gallery.js
++++ b/public/gallery.js
+@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
+ // Used to link a gallery item to the matching products category, when there is one.
+ async function loadProductCategories() {
+   try {
+-    const res = await fetch(apiUrl('/api/categories'));
+-    if (res.ok) productCategories = await res.json();
++    productCategories = await fetchData('categories', '/api/categories');
+   } catch (e) {
+     productCategories = [];
+   }
+@@ -27,10 +26,9 @@ async function loadProductCategories() {
+ 
+ async function loadGalleryItems() {
+   try {
+-    // Fetch gallery items from server API endpoint
+-    const response = await fetch(apiUrl('/api/gallery'));
+-    if (!response.ok) throw new Error('Failed to load gallery');
+-    allGalleryItems = await response.json();
++    // Fetch gallery items -- from the static build's data snapshot when
++    // available, otherwise the live API (see fetchData in config.js).
++    allGalleryItems = await fetchData('gallery', '/api/gallery');
+     // Filter to only active items
+     allGalleryItems = allGalleryItems.filter(item => item.active !== false);
+   } catch (error) {
+diff --git a/public/products.js b/public/products.js
+index d395930..d9e335c 100644
+--- a/public/products.js
++++ b/public/products.js
+@@ -18,10 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
+ 
+ async function loadProducts() {
+   try {
+-    // Fetch products from server API endpoint
+-    const response = await fetch(apiUrl('/api/products'));
+-    if (!response.ok) throw new Error('Failed to load products');
+-    allProducts = await response.json();
++    // Fetch products -- from the static build's data snapshot when available,
++    // otherwise the live API (see fetchData in config.js).
++    allProducts = await fetchData('products', '/api/products');
+     // Filter to only active products
+     allProducts = allProducts.filter(product => product.active !== false);
+   } catch (error) {
+diff --git a/publish.js b/publish.js
+index 4c1b65c..1c4f8a9 100644
+--- a/publish.js
++++ b/publish.js
+@@ -2,14 +2,18 @@
+  * Static site publishing.
+  *
+  * The customer-facing pages are a Render Static Site built from this repo.
+- * Product, gallery and settings content is fetched from this API at runtime,
+- * so content edits made in the admin panel are live immediately and do NOT
+- * require a rebuild. A rebuild is only needed when the page files themselves
+- * change (layout, styling, new pages).
++ * Product, gallery, category and settings content is baked into that build as
++ * static JSON (see build-static.sh) rather than fetched from this API at
++ * runtime, so browsing the site is never slowed down by this API service
++ * waking up from Render's free-tier sleep. This means a rebuild is now needed
++ * both for page/layout changes AND whenever product, price, gallery or
++ * business-detail content changes and should reach customers.
+  *
+  * This module triggers that rebuild by calling the static service's Render
+  * Deploy Hook. Calls are debounced so that a burst of admin edits results in a
+- * single build rather than one per save.
++ * single build rather than one per save. Publishing stays a deliberate,
++ * admin-triggered action (the "Update website now" button on the Website tab)
++ * rather than automatic on every save -- AUTO_PUBLISH is off by default.
+  */
+ 
+ const DEPLOY_HOOK_URL = process.env.RENDER_DEPLOY_HOOK_URL || '';
+diff --git a/render.yaml b/render.yaml
+index f013c4e..eb62f0a 100644
+--- a/render.yaml
++++ b/render.yaml
+@@ -25,11 +25,15 @@ services:
+       - key: STATIC_SITE_ORIGINS
+         sync: false
+       # Deploy hook URL of the static service (Render > static site > Settings >
+-      # Deploy Hook). Enables the "Update website" button in the admin panel.
++      # Deploy Hook). Required for the "Update website now" button in the admin
++      # panel: the static build fetches products/gallery/categories/settings
++      # from this API at build time (see build-static.sh), so this is now how
++      # content edits reach the public site, not just design/layout changes.
+       - key: RENDER_DEPLOY_HOOK_URL
+         sync: false
+-      # Set to "true" to also rebuild automatically after admin content changes.
+-      # Not required: content is served from this API and is live immediately.
++      # Set to "true" to rebuild automatically a couple of minutes after admin
++      # content changes, instead of requiring a click on "Update website now".
++      # Left off by default so publishing stays a deliberate admin action.
+       - key: AUTO_PUBLISH
+         value: "false"
+ 
+-- 
+2.43.0
+

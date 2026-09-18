@@ -45,6 +45,27 @@
     return path;
   };
 
+  // Product/gallery/category/settings data is baked into the static build as
+  // JSON (see build-static.sh) so browsing the site never has to wait on the
+  // API service waking up from Render's free-tier sleep. Each page asks for
+  // this data through fetchData(name, apiPath) instead of calling the API
+  // directly. On the static site this reads /data/<name>.json, which was
+  // fetched from the live API at build time. If that file is missing (local
+  // dev, or the very first deploy before a build has run) it falls back to
+  // calling the live API, so nothing breaks -- it just won't be cold-start-proof
+  // until the next publish.
+  window.fetchData = async function (name, apiPath) {
+    if (origin) {
+      try {
+        const staticRes = await fetch('/data/' + name + '.json');
+        if (staticRes.ok) return staticRes.json();
+      } catch (e) { /* fall through to live API */ }
+    }
+    const res = await fetch(window.apiUrl(apiPath));
+    if (!res.ok) throw new Error('Failed to load ' + apiPath);
+    return res.json();
+  };
+
   // The admin pages (admin.html, order-tracking.html) are served by the web
   // service, not the static site. Rewrite links to them at page load.
   var ADMIN_PAGES = ['admin.html', 'order-tracking.html'];

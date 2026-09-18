@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Used to link a gallery item to the matching products category, when there is one.
 async function loadProductCategories() {
   try {
-    const res = await fetch(apiUrl('/api/categories'));
-    if (res.ok) productCategories = await res.json();
+    productCategories = await fetchData('categories', '/api/categories');
   } catch (e) {
     productCategories = [];
   }
@@ -27,10 +26,9 @@ async function loadProductCategories() {
 
 async function loadGalleryItems() {
   try {
-    // Fetch gallery items from server API endpoint
-    const response = await fetch(apiUrl('/api/gallery'));
-    if (!response.ok) throw new Error('Failed to load gallery');
-    allGalleryItems = await response.json();
+    // Fetch gallery items -- from the static build's data snapshot when
+    // available, otherwise the live API (see fetchData in config.js).
+    allGalleryItems = await fetchData('gallery', '/api/gallery');
     // Filter to only active items
     allGalleryItems = allGalleryItems.filter(item => item.active !== false);
   } catch (error) {

@@ -25,11 +25,15 @@ services:
       - key: STATIC_SITE_ORIGINS
         sync: false
       # Deploy hook URL of the static service (Render > static site > Settings >
-      # Deploy Hook). Enables the "Update website" button in the admin panel.
+      # Deploy Hook). Required for the "Update website now" button in the admin
+      # panel: the static build fetches products/gallery/categories/settings
+      # from this API at build time (see build-static.sh), so this is now how
+      # content edits reach the public site, not just design/layout changes.
       - key: RENDER_DEPLOY_HOOK_URL
         sync: false
-      # Set to "true" to also rebuild automatically after admin content changes.
-      # Not required: content is served from this API and is live immediately.
+      # Set to "true" to rebuild automatically a couple of minutes after admin
+      # content changes, instead of requiring a click on "Update website now".
+      # Left off by default so publishing stays a deliberate admin action.
       - key: AUTO_PUBLISH
         value: "false"
 

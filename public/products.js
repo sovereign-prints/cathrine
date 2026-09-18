@@ -18,10 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadProducts() {
   try {
-    // Fetch products from server API endpoint
-    const response = await fetch(apiUrl('/api/products'));
-    if (!response.ok) throw new Error('Failed to load products');
-    allProducts = await response.json();
+    // Fetch products -- from the static build's data snapshot when available,
+    // otherwise the live API (see fetchData in config.js).
+    allProducts = await fetchData('products', '/api/products');
     // Filter to only active products
     allProducts = allProducts.filter(product => product.active !== false);
   } catch (error) {

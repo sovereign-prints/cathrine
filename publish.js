@@ -2,14 +2,18 @@
  * Static site publishing.
  *
  * The customer-facing pages are a Render Static Site built from this repo.
- * Product, gallery and settings content is fetched from this API at runtime,
- * so content edits made in the admin panel are live immediately and do NOT
- * require a rebuild. A rebuild is only needed when the page files themselves
- * change (layout, styling, new pages).
+ * Product, gallery, category and settings content is baked into that build as
+ * static JSON (see build-static.sh) rather than fetched from this API at
+ * runtime, so browsing the site is never slowed down by this API service
+ * waking up from Render's free-tier sleep. This means a rebuild is now needed
+ * both for page/layout changes AND whenever product, price, gallery or
+ * business-detail content changes and should reach customers.
  *
  * This module triggers that rebuild by calling the static service's Render
  * Deploy Hook. Calls are debounced so that a burst of admin edits results in a
- * single build rather than one per save.
+ * single build rather than one per save. Publishing stays a deliberate,
+ * admin-triggered action (the "Update website now" button on the Website tab)
+ * rather than automatic on every save -- AUTO_PUBLISH is off by default.
  */
 
 const DEPLOY_HOOK_URL = process.env.RENDER_DEPLOY_HOOK_URL || '';

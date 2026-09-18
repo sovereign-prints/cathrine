@@ -259,8 +259,8 @@ document.addEventListener('click', (e) => {
 async function loadContactDetails() {
   let settings = {};
   try {
-    const res = await fetch(apiUrl('/api/settings'));
-    if (res.ok) settings = (await res.json()).settings || {};
+    const data = await fetchData('settings', '/api/settings');
+    settings = data.settings || {};
   } catch (e) {
     return; // leave the markup as-is if settings can't be reached
   }
