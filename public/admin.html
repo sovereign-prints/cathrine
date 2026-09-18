@@ -823,6 +823,7 @@
         <a href="#" data-tab="gallery" class="sidebar-link">🖼️ Gallery</a>
         <a href="#" data-tab="settings" class="sidebar-link">⚙️ Settings</a>
         <a href="#" data-tab="website" class="sidebar-link">🚀 Website</a>
+        <a href="#" data-tab="migrations" class="sidebar-link">🔄 Image Migration</a>
         <a href="order-tracking.html" class="sidebar-link">💼 Quotes & Orders</a>
         <a href="https://sovereignprints.onrender.com/" target="_blank" rel="noopener" class="sidebar-link">🏠 View Site</a>
         <a href="#" id="logoutBtn" class="sidebar-link logout">🚪 Logout</a>
@@ -1071,6 +1072,30 @@
             <button type="submit" class="btn btn-primary">Save Settings</button>
             <div id="settingsMessage" style="margin-top:12px;"></div>
           </form>
+        </div>
+      </div>
+
+      <!-- MIGRATIONS TAB -->
+      <div id="migrations" class="tab-content">
+        <div class="section">
+          <h2>Image Migration to Cloudinary</h2>
+          <p style="color:var(--text-light); max-width:60ch; margin-bottom:20px;">
+            Move all product and gallery images from the database to Cloudinary CDN. This eliminates cold-start delays and makes images load instantly (~500ms instead of 10-30 seconds).
+          </p>
+
+          <div id="migrationStatus" style="margin:20px 0; padding:15px; border-radius:8px; background:var(--surface-2); color:var(--text-light); display:none;">
+            <div id="migrationStatusTitle" style="font-weight:600; margin-bottom:8px;"></div>
+            <div id="migrationStatusMessage" style="font-size:14px; line-height:1.5;"></div>
+            <div id="migrationProgress" style="background:var(--border); height:8px; border-radius:4px; margin-top:10px; overflow:hidden; display:none;">
+              <div id="migrationProgressFill" style="background:var(--primary); height:100%; width:0%; transition:width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-primary" id="migrationBtn" onclick="startImageMigration()">Start Migration</button>
+
+          <div id="migrationDetails" style="margin-top:20px; padding:15px; background:var(--surface-2); border-radius:8px; display:none; max-height:300px; overflow-y:auto;">
+            <div id="migrationDetailsContent" style="font-family:monospace; font-size:12px; line-height:1.6; color:var(--text-light);"></div>
+          </div>
         </div>
       </div>
 
@@ -2283,6 +2308,66 @@
         message.innerHTML = '<span style="color:#ef4444;">Could not save settings. Please try again.</span>';
       }
       setTimeout(() => { message.innerHTML = ''; }, 4000);
+    }
+
+    // ============ IMAGE MIGRATION ============
+    async function startImageMigration() {
+      const btn = document.getElementById('migrationBtn');
+      const status = document.getElementById('migrationStatus');
+      const statusTitle = document.getElementById('migrationStatusTitle');
+      const statusMessage = document.getElementById('migrationStatusMessage');
+      const details = document.getElementById('migrationDetails');
+      const detailsContent = document.getElementById('migrationDetailsContent');
+
+      btn.disabled = true;
+
+      // Show loading status
+      status.style.display = 'block';
+      statusTitle.textContent = '⏳ Migration in progress...';
+      statusMessage.textContent = 'Uploading images to Cloudinary. This may take a few minutes.';
+
+      try {
+        const response = await fetch('/api/admin/migrate-images-to-cloudinary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Migration failed');
+        }
+
+        // Success
+        statusTitle.textContent = '✅ Migration completed!';
+        statusMessage.textContent = `Successfully migrated ${data.migrations.success} images${data.migrations.failed > 0 ? `. ${data.migrations.failed} images failed.` : '. All images uploaded!'}`;
+
+        // Show details
+        if (data.migrations.details) {
+          const { success, failed } = data.migrations.details;
+          let html = '<strong>Successful:</strong><br>';
+          success.forEach(item => {
+            html += `<div style="color:#10b981; margin:4px 0;">✓ ${item.filename}</div>`;
+          });
+
+          if (failed.length > 0) {
+            html += '<br><strong>Failed:</strong><br>';
+            failed.forEach(item => {
+              html += `<div style="color:#ef4444; margin:4px 0;">✗ ${item.filename}: ${item.error}</div>`;
+            });
+          }
+
+          detailsContent.innerHTML = html;
+          details.style.display = 'block';
+        }
+
+      } catch (err) {
+        statusTitle.textContent = '❌ Migration failed';
+        statusMessage.textContent = err.message;
+        status.style.color = 'var(--error)';
+      } finally {
+        btn.disabled = false;
+      }
     }
   </script>
 
