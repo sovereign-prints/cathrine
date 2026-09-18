@@ -1377,7 +1377,7 @@ app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) 
           continue;
         }
 
-        const buffer = await imageResponse.buffer();
+        const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
         // Upload to Cloudinary
         const cloudinaryResponse = await new Promise((resolve, reject) => {
@@ -1429,7 +1429,7 @@ app.post('/api/admin/migrate-images-to-cloudinary', adminAuth, async (req, res) 
           continue;
         }
 
-        const buffer = await imageResponse.buffer();
+        const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
         // Upload to Cloudinary
         const cloudinaryResponse = await new Promise((resolve, reject) => {
