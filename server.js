@@ -1,3 +1,4 @@
+// FIXED: Image migration now fetches from /uploads URLs instead of files table
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
