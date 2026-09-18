@@ -11,6 +11,15 @@ const fs = require('fs');
 const sharp = require('sharp');
 require('dotenv').config();
 
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 const db = require('./db');
 
 const app = express();
@@ -70,10 +79,19 @@ app.get(CUSTOMER_PAGES.map(p => '/' + p), (req, res) => res.status(404).send('No
 
 app.use(express.static('public', { maxAge: '1d' }));
 
-// File upload configuration - files are stored in the database, not on disk,
-// so uploads survive redeploys/restarts on ephemeral hosting.
+// File upload configuration - files are uploaded to Cloudinary CDN
+// so they load instantly regardless of backend cold-start.
+const cloudinaryStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'sovereign-prints',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'png', 'webp', 'gif']
+  }
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: cloudinaryStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -115,6 +133,15 @@ async function processImageBuffer(buffer) {
 }
 
 async function saveUploadedFile(file) {
+  // CloudinaryStorage has already uploaded the file and populated file.path
+  if (file.path) {
+    // file.path is the Cloudinary URL, e.g.:
+    // https://res.cloudinary.com/liowbk0n/image/upload/v.../sovereign-prints/...
+    return file.path;
+  }
+
+  // Fallback: if Cloudinary upload somehow didn't happen, fall back to DB
+  // (This should rarely/never happen, but keeping it for safety)
   const isImage = /^image\//.test(file.mimetype) && !/svg/.test(file.mimetype);
   let buffer = file.buffer;
   let mimetype = file.mimetype;
@@ -130,6 +157,7 @@ async function saveUploadedFile(file) {
   }
 
   const id = crypto.randomUUID() + extname;
+  console.warn(`Cloudinary upload may have failed for ${file.originalname}; falling back to DB storage.`);
   await db.query(
     'INSERT INTO files (id, filename, mimetype, data) VALUES ($1, $2, $3, $4)',
     [id, file.originalname, mimetype, buffer]
