@@ -381,6 +381,21 @@ app.get('/uploads/:id', async (req, res) => {
 
 // ============ PRODUCT ROUTES ============
 
+// GET /api/check-image-urls - Debug endpoint to see what image URLs are in database
+app.get('/api/check-image-urls', async (req, res) => {
+  try {
+    const productImages = await db.query('SELECT DISTINCT image_url FROM product_images LIMIT 5');
+    const galleryImages = await db.query('SELECT DISTINCT image FROM gallery LIMIT 5');
+
+    res.json({
+      product_image_urls: productImages.rows.map(r => r.image_url),
+      gallery_image_urls: galleryImages.rows.map(r => r.image)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/products', async (req, res) => {
   try {
     const category = req.query.category;
