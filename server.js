@@ -1336,6 +1336,23 @@ async function autoLoadGalleryImages() {
   }
 }
 
+// GET /api/admin/migration-status - Debug endpoint to see what images exist
+app.get('/api/admin/migration-status', adminAuth, async (req, res) => {
+  try {
+    const productImages = await db.query('SELECT id, image_url FROM product_images WHERE image_url LIKE $1', ['%/uploads/%']);
+    const galleryImages = await db.query('SELECT id, image FROM gallery WHERE image LIKE $1', ['%/uploads/%']);
+
+    res.json({
+      product_images_found: productImages.rows.length,
+      product_images: productImages.rows,
+      gallery_images_found: galleryImages.rows.length,
+      gallery_images: galleryImages.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/admin/migrate-images-to-cloudinary
 // Migrates all existing product_images and gallery images to Cloudinary
 // Fetches from /uploads/{id} endpoints, uploads to Cloudinary, updates database URLs
