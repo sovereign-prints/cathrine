@@ -2329,14 +2329,24 @@
       try {
         const response = await fetch('/api/admin/migrate-images-to-cloudinary', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-          throw new Error(data.error || 'Migration failed');
+          if (response.status === 401) {
+            throw new Error('Not authenticated. Please log in first.');
+          }
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            throw new Error(data.error || `Migration failed (${response.status})`);
+          } else {
+            throw new Error(`Server error (${response.status}). Check your login.`);
+          }
         }
+
+        const data = await response.json();
 
         // Success
         statusTitle.textContent = '✅ Migration completed!';
