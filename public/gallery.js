@@ -9,7 +9,6 @@ let productCategories = [];
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGalleryItems();
   await loadProductCategories();
-  setupCategoryTabs();
   displayGalleryItems();
   setupLightbox();
 });
@@ -41,58 +40,14 @@ async function loadGalleryItems() {
   }
 }
 
-// ============ CATEGORY TABS SETUP ============
-
-function setupCategoryTabs() {
-  const categoryTabs = document.getElementById('categoryTabs');
-  if (!categoryTabs) return;
-
-  // Get unique categories from gallery items
-  const uniqueCategories = [...new Set(allGalleryItems.map(item => item.category))].sort();
-
-  // Create category tabs
-  const categoryTabsHTML = uniqueCategories.map(category => `
-    <button class="category-tab" data-category="${category}">${category}</button>
-  `).join('');
-
-  categoryTabs.innerHTML += categoryTabsHTML;
-
-  // Add click listeners to all category tabs
-  document.querySelectorAll('.category-tab').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      // Remove active class from all buttons
-      document.querySelectorAll('.category-tab').forEach(b => {
-        b.classList.remove('active');
-      });
-      // Add active class to clicked button
-      e.target.classList.add('active');
-      // Update filter and display items
-      currentFilter = e.target.dataset.category;
-      displayGalleryItems();
-    });
-  });
-
-  // Set "All Gallery" as initially active
-  const allGalleryBtn = categoryTabs.querySelector('[data-category="all"]');
-  if (allGalleryBtn) {
-    allGalleryBtn.classList.add('active');
-  }
-}
-
 // ============ DISPLAY GALLERY ITEMS ============
 
 function displayGalleryItems() {
   const galleryGrid = document.getElementById('galleryGrid');
   if (!galleryGrid) return;
 
-  // Filter items
-  let filteredItems = allGalleryItems;
-  if (currentFilter !== 'all') {
-    filteredItems = allGalleryItems.filter(item => item.category === currentFilter);
-  }
-
-  // Render gallery items
-  galleryGrid.innerHTML = filteredItems.map(item => `
+  // Render all gallery items (no filtering)
+  galleryGrid.innerHTML = allGalleryItems.map(item => `
     <div class="gallery-item" data-gallery-id="${item.id}">
       <div class="gallery-image">
         <img src="${mediaUrl(item.image || item.imageUrl)}" alt="${item.title}" loading="lazy" decoding="async" style="width:100%; height:100%; object-fit:cover; display:block;">
