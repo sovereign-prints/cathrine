@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Migration — Sovereign Prints Admin</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .info-box {
+      background: #f0f9ff;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      margin-bottom: 30px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1e40af;
+    }
+
+    .status {
+      background: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      min-height: 60px;
+      display: none;
+    }
+
+    .status.show {
+      display: block;
+    }
+
+    .status.loading {
+      background: #dbeafe;
+      border-left: 4px solid #0ea5e9;
+    }
+
+    .status.success {
+      background: #dcfce7;
+      border-left: 4px solid #22c55e;
+    }
+
+    .status.error {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+    }
+
+    .status-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .status-message {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .progress-bar {
+      background: #e5e7eb;
+      height: 8px;
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      background: #3b82f6;
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .details {
+      background: #f9fafb;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #374151;
+      display: none;
+    }
+
+    .details.show {
+      display: block;
+    }
+
+    .detail-item {
+      padding: 5px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .detail-item:last-child {
+      border-bottom: none;
+    }
+
+    .success-item {
+      color: #059669;
+    }
+
+    .failed-item {
+      color: #dc2626;
+    }
+
+    .next-steps {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #92400e;
+      display: none;
+    }
+
+    .next-steps.show {
+      display: block;
+    }
+
+    .next-steps ol {
+      margin-left: 20px;
+      margin-top: 10px;
+    }
+
+    .next-steps li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Image Migration to Cloudinary</h1>
+    <p class="subtitle">Move all product images from database to CDN</p>
+
+    <div class="info-box">
+      <strong>What this does:</strong> Uploads all product and gallery images from PostgreSQL to Cloudinary. After migration, images will load instantly from the CDN instead of the backend, eliminating cold start delays.
+    </div>
+
+    <div class="status" id="status">
+      <div class="status-title" id="statusTitle"></div>
+      <div class="status-message" id="statusMessage"></div>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <button id="migrateBtn" onclick="startMigration()">
+      Start Migration
+    </button>
+
+    <div class="details" id="details">
+      <div id="detailsContent"></div>
+    </div>
+
+    <div class="next-steps" id="nextSteps">
+      <strong>Next Steps After Migration:</strong>
+      <ol>
+        <li>Verify images in Cloudinary console: <a href="https://console.cloudinary.com/console/media_library" target="_blank">Media Library</a></li>
+        <li>Run SQL to update database URLs (see details below)</li>
+        <li>Test website: <a href="https://sovereignprints.onrender.com/products.html" target="_blank">Products Page</a></li>
+        <li>Images should now load instantly!</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    async function startMigration() {
+      const btn = document.getElementById('migrateBtn');
+      const status = document.getElementById('status');
+      const statusTitle = document.getElementById('statusTitle');
+      const statusMessage = document.getElementById('statusMessage');
+      const details = document.getElementById('details');
+      const nextSteps = document.getElementById('nextSteps');
+
+      btn.disabled = true;
+
+      // Show loading status
+      status.classList.add('show', 'loading');
+      statusTitle.textContent = '⏳ Migration in progress...';
+      statusMessage.textContent = 'Uploading images to Cloudinary. This may take a few minutes.';
+
+      try {
+        const response = await fetch('https://cathrine.onrender.com/api/admin/migrate-images-to-cloudinary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Migration failed');
+        }
+
+        // Success
+        status.classList.remove('loading', 'error');
+        status.classList.add('success');
+        statusTitle.textContent = '✅ Migration completed!';
+        statusMessage.textContent = `Successfully migrated ${data.migrations.success} images. ${data.migrations.failed > 0 ? `${data.migrations.failed} images failed.` : 'All images uploaded!'}`;
+
+        // Show details
+        if (data.migrations.details) {
+          const { success, failed } = data.migrations.details;
+          let html = '<strong>Successful uploads:</strong><br>';
+          success.forEach(item => {
+            html += `<div class="detail-item success-item">✓ ${item.filename} → ${item.cloudinaryUrl}</div>`;
+          });
+
+          if (failed.length > 0) {
+            html += '<br><strong>Failed uploads:</strong><br>';
+            failed.forEach(item => {
+              html += `<div class="detail-item failed-item">✗ ${item.filename}: ${item.error}</div>`;
+            });
+          }
+
+          document.getElementById('detailsContent').innerHTML = html;
+          details.classList.add('show');
+        }
+
+        // Show next steps
+        nextSteps.classList.add('show');
+
+      } catch (err) {
+        status.classList.remove('loading', 'success');
+        status.classList.add('error');
+        statusTitle.textContent = '❌ Migration failed';
+        statusMessage.textContent = err.message + '. Make sure you\'re logged in as admin.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
