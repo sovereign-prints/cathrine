@@ -11,40 +11,6 @@
       background: #16213e;
     }
 
-    .category-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 40px;
-      border-bottom: 2px solid #e5e7eb;
-      padding-bottom: 20px;
-      overflow-x: auto;
-    }
-
-    .category-tab {
-      padding: 10px 20px;
-      border: none;
-      background: rgba(129, 140, 248, 0.1);
-      color: #ffffff;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s ease;
-      white-space: nowrap;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-radius: 6px;
-    }
-
-    .category-tab:hover {
-      background: rgba(129, 140, 248, 0.2);
-      color: #818cf8;
-    }
-
-    .category-tab.active {
-      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-      color: #ffffff;
-    }
 
     .products-grid {
       display: grid;
@@ -339,16 +305,7 @@
         gap: 20px;
       }
 
-      .category-tabs {
-        gap: 8px;
-      }
-
-      .category-tab {
-        padding: 8px 16px;
-        font-size: 14px;
-      }
-
-      .modal-content {
+.modal-content {
         max-width: 95%;
         padding: 20px;
       }
@@ -390,15 +347,9 @@
     </div>
   </section>
 
-  <!-- Products Section with Category Tabs -->
+  <!-- Products Section -->
   <section class="products-section">
     <div class="container">
-      <!-- Category Tabs -->
-      <div class="category-tabs" id="categoryTabs">
-        <button class="category-tab active" data-category="all">All Products</button>
-        <!-- Additional categories populated by JavaScript -->
-      </div>
-
       <!-- Products Grid -->
       <div class="products-grid" id="productsGrid">
         <!-- Populated by JavaScript -->

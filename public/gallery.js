@@ -53,7 +53,6 @@ function displayGalleryItems() {
         <img src="${mediaUrl(item.image || item.imageUrl)}" alt="${item.title}" loading="lazy" decoding="async" style="width:100%; height:100%; object-fit:cover; display:block;">
       </div>
       <div class="gallery-info">
-        <div class="gallery-category">${item.category}</div>
         <h3>${item.title}</h3>
         <p>${item.description || 'Custom branding and printing services'}</p>
         <button class="btn-view" data-gallery-id="${item.id}">View Details</button>

@@ -10,7 +10,6 @@ const PRICING_VISIBLE = true;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadProducts();
-  setupCategoryTabs();
   displayProducts();
   setupModal();
 });
@@ -32,62 +31,14 @@ async function loadProducts() {
   }
 }
 
-// ============ CATEGORY TABS SETUP ============
-
-function setupCategoryTabs() {
-  const categoryTabs = document.getElementById('categoryTabs');
-  if (!categoryTabs) return;
-
-  // Get unique categories from products
-  const uniqueCategories = [...new Set(allProducts.map(product => product.category))].sort();
-
-  // Create category tabs
-  const categoryTabsHTML = uniqueCategories.map(category => `
-    <button class="category-tab" data-category="${category}">${category}</button>
-  `).join('');
-
-  categoryTabs.innerHTML += categoryTabsHTML;
-
-  // Add click listeners to all category tabs
-  document.querySelectorAll('.category-tab').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      // Remove active class from all buttons
-      document.querySelectorAll('.category-tab').forEach(b => {
-        b.classList.remove('active');
-      });
-      // Add active class to clicked button
-      e.target.classList.add('active');
-      // Update filter and display products
-      currentFilter = e.target.dataset.category;
-      displayProducts();
-    });
-  });
-
-  // Honour ?category=... from the homepage links; otherwise show everything.
-  const wanted = new URLSearchParams(location.search).get('category');
-  const match = wanted && uniqueCategories.find(c => c.toLowerCase() === wanted.toLowerCase());
-  const initial = match || 'all';
-
-  document.querySelectorAll('.category-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.category === initial);
-  });
-  currentFilter = initial;
-}
-
 // ============ DISPLAY PRODUCTS ============
 
 function displayProducts() {
   const productsGrid = document.getElementById('productsGrid');
   if (!productsGrid) return;
 
-  // Filter products
-  let filteredProducts = allProducts;
-  if (currentFilter !== 'all') {
-    filteredProducts = allProducts.filter(product => product.category === currentFilter);
-  }
-
-  // Render products
-  productsGrid.innerHTML = filteredProducts.map(product => {
+  // Render all products (no filtering)
+  productsGrid.innerHTML = allProducts.map(product => {
     const imageCount = (product.images || []).length;
     return `
     <div class="product-card" data-product-id="${product.id}">
